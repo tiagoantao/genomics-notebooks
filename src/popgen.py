@@ -10,9 +10,8 @@
 
 '''
 
-from model import *
-from chart import *
-
 # We really do not care about importing * into the namespace:
 #   The purpose here is to make a small language to teach
 #   population genomics, not standard software engineering practices
+from model import *
+from chart import *

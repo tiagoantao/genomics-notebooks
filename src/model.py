@@ -13,26 +13,35 @@
 import copy
 import inspect
 import numpy as np
+import simuOpt
+simuOpt.setOptions(gui=False, quiet=True)
 import simuPOP as sp
+
+
+def _hook_view(pop, param):
+    view = param
+    view.complete_cycle(pop)
+    return True
 
 
 class Model:
     def __init__(self, gens):
         self._gens = gens
-        self._funs = []
+        self._views = []
         self.pop_size = 100
         self.num_msats = 100
         self._stats = set()
-        self._info_fields = ['sim_id']
+        self._info_fields = set()
         self._sim_ids = []
+        self._sims = []
 
-    def register(self, fun):
-        self._funs.append(fun)
+    def register(self, view):
+        self._views.append(view)
 
     def add_stat(self, stat):
         self._stats.add(stat)
 
-    def _createGenome(self, num_msats):
+    def _create_genome(self, num_msats):
         init_ops = []
         loci = num_msats * [1]
         max_allele_msats = 100
@@ -53,19 +62,15 @@ class Model:
 
         return loci, init_ops
 
-    def _createSinglePop(self, pop_size, nloci):
+    def _create_single_pop(self, pop_size, nloci):
         init_ops = []
         init_ops.append(sp.InitSex())
         pop = sp.Population(pop_size, ploidy=2, loci=[1] * nloci,
                             chromTypes=[sp.AUTOSOME] * nloci,
-                            infoFields=["ind_id"])
+                            infoFields=list(self._info_fields))
         return pop, init_ops
 
-    def _createSim(self, pop, reps):
-        sim = sp.Simulator(pop, rep=reps)
-        return sim
-
-    def run(self):
+    def prepare_sim_vars(self):
         fixed_params = {}
         variation_params = {}
         for name, val in inspect.getmembers(self):
@@ -98,3 +103,88 @@ class Model:
                     self._sim_ids.append(sim_params)
         else:
             raise Exception('Maximum of 2 parameters varying')
+
+    def prepare_sim(self, params):
+        for view in self._views:
+            for info in view.info_fields:
+                self._info_fields.add(info)
+        pop, init_ops = self._create_single_pop(params['pop_size'],
+                                                params['num_msats'])
+        loci, genome_init = self._create_genome(params['num_msats'])
+        pre_ops = []
+        view_ops = []
+        post_ops = []
+        for view in self._views:
+            view_ops.extend(view.post_ops)
+        for view in self._views:
+            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
+        post_ops = view_ops + post_ops
+        sim = sp.Simulator(pop, 1, True)
+        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+                'pre_ops': pre_ops, 'post_ops': post_ops}
+
+    def _run(self, sim_id, params):
+        pr = self.prepare_sim(params)
+        sim = pr['sim']
+        for view in self._views:
+            view.set_sim_id(sim_id)
+        sim.evolve(initOps=pr['init_ops'],
+                   preOps=pr['pre_ops'],
+                   postOps=pr['post_ops'],
+                   matingScheme=sp.RandomMating(),
+                   gen=self._gens)
+        for view in self._views:
+            view.complete_sim()
+
+    def run(self):
+        self.prepare_sim_vars()
+        for view in self._views:
+            view.start()
+        for params in self._sim_ids:
+            self._sims.append(self.prepare_sim(params))
+        for i, params in enumerate(self._sim_ids):
+            self._run(i, params)
+        for view in self._views:
+            view.end()
+
+
+class LociParameter():
+    def __init__(self):
+        self.name = None
+        self.simupop_info = []
+        self.simupop_stats = []
+
+    def get_values(self, pop):
+        raise NotImplementedError
+
+
+class ObsHe(LociParameter):
+    def __init__(self):
+        LociParameter.__init__(self)
+        self.name = 'ObsHe'
+        self.simupop_stats = [sp.Stat(heteroFreq=True)]
+
+    def get_values(self, pop):
+        loci = list(pop.dvars().heteroFreq.keys())
+        loci.sort()
+        return [pop.dvars().heteroFreq[l] for l in loci]
+
+
+class ExpHe(LociParameter):
+    def __init__(self):
+        LociParameter.__init__(self)
+        self.name = 'ExpHe'
+        self.simupop_stats = [sp.Stat(alleleFreq=True)]
+
+    def get_values(self, pop):
+        freqs = pop.dvars().alleleFreq
+        loci = list(freqs.keys())
+        loci.sort()
+        expHe = []
+        for locus in loci:
+            afreqs = freqs[locus]
+            expHo = 0
+            for allele, freq in afreqs.items():
+                expHo += freq*freq
+            expHe.append(1 - expHo)
+        return expHe
