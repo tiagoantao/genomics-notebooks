@@ -117,7 +117,10 @@ class BasicViewTwo(View):
         for i in range(len(p1)):
             for j in range(len(p2)):
                 sim_id = i * len(p2) + j
-                self.axs[i, j].set_title('%s' % self.model._sim_ids[sim_id])
+                my_vars = {k: v for k, v in
+                           self.model._sim_ids[sim_id].items()
+                           if k in self.model._variation_params}
+                self.axs[i, j].set_title('%s' % my_vars)
                 results = self.results[self.param][sim_id]
                 for my_case in results:
                     self.axs[i, j].plot(my_case)

@@ -42,6 +42,15 @@ class Model:
     def add_stat(self, stat):
         self._stats.add(stat)
 
+    def _create_snp_genome(self, num_snps, freq):
+        init_ops = []
+        loci = num_snps * [1]
+
+        for snp in range(num_snps):
+            init_ops.append(sp.InitGenotype(freq=[1 - freq, freq], loci=snp))
+
+        return loci, init_ops
+
     def _create_genome(self, num_msats):
         init_ops = []
         loci = num_msats * [1]
@@ -132,7 +141,7 @@ class Model:
         sim.evolve(initOps=pr['init_ops'],
                    preOps=pr['pre_ops'],
                    postOps=pr['post_ops'],
-                   matingScheme=sp.RandomMating(),
+                   matingScheme=pr['mating_scheme'],
                    gen=self._gens)
         for view in self._views:
             view.complete_sim()
@@ -165,7 +174,72 @@ class SinglePop(Model):
         post_ops = view_ops + post_ops
         sim = sp.Simulator(pop, 1, True)
         return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
-                'pre_ops': pre_ops, 'post_ops': post_ops}
+                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'mating_scheme': sp.RandomMating()}
+
+
+class Bottleneck(Model):
+    def prepare_sim(self, params):
+        for view in self._views:
+            for info in view.info_fields:
+                self._info_fields.add(info)
+        pop, init_ops, pre_ops, post_ops = \
+            self._create_single_pop(params['start_size'], params['num_msats'])
+        loci, genome_init = self._create_genome(params['num_msats'])
+        view_ops = []
+        for view in self._views:
+            view_ops.extend(view.post_ops)
+        for view in self._views:
+            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
+        post_ops = view_ops + post_ops
+        sim = sp.Simulator(pop, 1, True)
+        pre_ops.append(sp.ResizeSubPops(
+            proportions=(params['end_size'] / params['start_size'],),
+            at=params['bgen']))
+        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'mating_scheme': sp.RandomMating()}
+
+
+class SelectionPop(Model):
+    def __init__(self, gens):
+        Model.__init__(self, gens)
+        self.sel = 0.01
+        self.freq = 0.01
+
+    def prepare_sim(self, params):
+        for view in self._views:
+            for info in view.info_fields:
+                self._info_fields.add(info)
+        pop, init_ops, pre_ops, post_ops = \
+            self._create_single_pop(params['pop_size'], 1)
+        view_ops = []
+        for view in self._views:
+            view_ops.extend(view.post_ops)
+        for view in self._views:
+            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
+        post_ops = view_ops + post_ops
+        loci, genome_init = self._create_snp_genome(1, freq=params['freq'])
+        sim = sp.Simulator(pop, 1, True)
+        if params['sel_type'] == 'hz_advantage':
+            ms = sp.MapSelector(loci=0, fitness={
+                (0, 0): 1 - params['sel'],
+                (0, 1): 1,
+                (1, 1): 1 - params['sel']})
+        elif params['sel_type'] == 'recessive':
+            ms = sp.MapSelector(loci=0, fitness={
+                (0, 0): 1 - params['sel'],
+                (0, 1): 1 - params['sel'],
+                (1, 1): 1})
+        else:  # dominant
+            ms = sp.MapSelector(loci=0, fitness={
+                (0, 0): 1 - params['sel'],
+                (0, 1): 1,
+                (1, 1): 1})
+        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'mating_scheme': sp.RandomMating(
+                    ops=[sp.MendelianGenoTransmitter(), ms])}
 
 
 class Island(Model):
@@ -190,7 +264,8 @@ class Island(Model):
         post_ops = view_ops + post_ops
         sim = sp.Simulator(pop, 1, True)
         return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
-                'pre_ops': pre_ops, 'post_ops': post_ops}
+                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'mating_scheme': sp.RandomMating()}
 
 
 class LociParameter():
@@ -263,3 +338,32 @@ class FST(LociParameter):
     def get_values(self, pop):
         fst = pop.dvars().F_st
         return [fst]
+
+
+class LDNe(LociParameter):
+    def __init__(self, pcrit=0.02):
+        LociParameter.__init__(self)
+        self.name = 'LDNe'
+        self.desc = 'LDNe'
+        self.pcrit = pcrit
+        self.simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
+                                      vars='Ne_LD')]
+
+    def get_values(self, pop):
+        ne = pop.dvars().Ne_LD
+        return [ne[self.pcrit]]
+
+
+class FreqDerived(LociParameter):
+    def __init__(self):
+        LociParameter.__init__(self)
+        self.name = 'FreqDerived'
+        self.desc = 'Frequency of the Derived Allele'
+        self.simupop_stats = [sp.Stat(alleleFreq=True)]
+
+    def get_values(self, pop):
+        anum = pop.dvars().alleleFreq
+        loci = list(anum.keys())
+        loci.sort()
+        anums = [anum[0][1]]
+        return anums
