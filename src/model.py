@@ -16,6 +16,7 @@ import numpy as np
 import simuOpt
 simuOpt.setOptions(gui=False, quiet=True)
 import simuPOP as sp
+from simuPOP import demography
 
 
 def _hook_view(pop, param):
@@ -68,7 +69,21 @@ class Model:
         pop = sp.Population(pop_size, ploidy=2, loci=[1] * nloci,
                             chromTypes=[sp.AUTOSOME] * nloci,
                             infoFields=list(self._info_fields))
-        return pop, init_ops
+        pre_ops = []
+        post_ops = []
+        return pop, init_ops, pre_ops, post_ops
+
+    def _create_island(self, pop_sizes, mig, nloci):
+        init_ops = []
+        init_ops.append(sp.InitSex())
+        pop = sp.Population(pop_sizes, ploidy=2, loci=[1] * nloci,
+                            chromTypes=[sp.AUTOSOME] * nloci,
+                            infoFields=list(self._info_fields))
+        post_ops = [sp.Migrator(
+            demography.migrIslandRates(mig, len(pop_sizes)))]
+        pre_ops = []
+        self._info_fields.add('migrate_to')
+        return pop, init_ops, pre_ops, post_ops
 
     def prepare_sim_vars(self):
         fixed_params = {}
@@ -81,6 +96,8 @@ class Model:
             else:
                 fixed_params[name] = val
         self._set_sim_ids(fixed_params, variation_params)
+        self._variation_params = variation_params
+        self._fixed_params = fixed_params
 
     def _set_sim_ids(self, fixed_params, variation_params):
         if len(variation_params) == 0:
@@ -105,23 +122,7 @@ class Model:
             raise Exception('Maximum of 2 parameters varying')
 
     def prepare_sim(self, params):
-        for view in self._views:
-            for info in view.info_fields:
-                self._info_fields.add(info)
-        pop, init_ops = self._create_single_pop(params['pop_size'],
-                                                params['num_msats'])
-        loci, genome_init = self._create_genome(params['num_msats'])
-        pre_ops = []
-        view_ops = []
-        post_ops = []
-        for view in self._views:
-            view_ops.extend(view.post_ops)
-        for view in self._views:
-            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
-        post_ops = view_ops + post_ops
-        sim = sp.Simulator(pop, 1, True)
-        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
-                'pre_ops': pre_ops, 'post_ops': post_ops}
+        raise NotImplementedError('Use a concrete subclass')
 
     def _run(self, sim_id, params):
         pr = self.prepare_sim(params)
@@ -148,9 +149,54 @@ class Model:
             view.end()
 
 
+class SinglePop(Model):
+    def prepare_sim(self, params):
+        for view in self._views:
+            for info in view.info_fields:
+                self._info_fields.add(info)
+        pop, init_ops, pre_ops, post_ops = \
+            self._create_single_pop(params['pop_size'], params['num_msats'])
+        loci, genome_init = self._create_genome(params['num_msats'])
+        view_ops = []
+        for view in self._views:
+            view_ops.extend(view.post_ops)
+        for view in self._views:
+            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
+        post_ops = view_ops + post_ops
+        sim = sp.Simulator(pop, 1, True)
+        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+                'pre_ops': pre_ops, 'post_ops': post_ops}
+
+
+class Island(Model):
+    def __init__(self, gens):
+        Model.__init__(self, gens)
+        self.num_pops = 5
+        self.mig = 0.01
+
+    def prepare_sim(self, params):
+        for view in self._views:
+            for info in view.info_fields:
+                self._info_fields.add(info)
+        pop, init_ops, pre_ops, post_ops = \
+            self._create_island([params['pop_size']] * params['num_pops'],
+                                params['mig'], params['num_msats'])
+        loci, genome_init = self._create_genome(params['num_msats'])
+        view_ops = []
+        for view in self._views:
+            view_ops.extend(view.post_ops)
+        for view in self._views:
+            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
+        post_ops = view_ops + post_ops
+        sim = sp.Simulator(pop, 1, True)
+        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+                'pre_ops': pre_ops, 'post_ops': post_ops}
+
+
 class LociParameter():
     def __init__(self):
         self.name = None
+        self.desc = None
         self.simupop_info = []
         self.simupop_stats = []
 
@@ -162,6 +208,7 @@ class ObsHe(LociParameter):
     def __init__(self):
         LociParameter.__init__(self)
         self.name = 'ObsHe'
+        self.desc = 'Observed Heterozygozity'
         self.simupop_stats = [sp.Stat(heteroFreq=True)]
 
     def get_values(self, pop):
@@ -174,6 +221,7 @@ class ExpHe(LociParameter):
     def __init__(self):
         LociParameter.__init__(self)
         self.name = 'ExpHe'
+        self.desc = 'Expected Heterozygozity'
         self.simupop_stats = [sp.Stat(alleleFreq=True)]
 
     def get_values(self, pop):
@@ -188,3 +236,30 @@ class ExpHe(LociParameter):
                 expHo += freq*freq
             expHe.append(1 - expHo)
         return expHe
+
+
+class NumAlleles(LociParameter):
+    def __init__(self):
+        LociParameter.__init__(self)
+        self.name = 'NumAlleles'
+        self.desc = 'Number of Alleles'
+        self.simupop_stats = [sp.Stat(alleleFreq=True)]
+
+    def get_values(self, pop):
+        anum = pop.dvars().alleleNum
+        loci = list(anum.keys())
+        loci.sort()
+        anums = [len(anum[l]) for l in loci]
+        return anums
+
+
+class FST(LociParameter):
+    def __init__(self):
+        LociParameter.__init__(self)
+        self.name = 'FST'
+        self.desc = 'FST'
+        self.simupop_stats = [sp.Stat(structure=sp.ALL_AVAIL)]
+
+    def get_values(self, pop):
+        fst = pop.dvars().F_st
+        return [fst]
