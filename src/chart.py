@@ -10,12 +10,16 @@
 
 '''
 
+from collections import defaultdict
+import statistics
+
 import matplotlib.pyplot as plt
 
 
 class View():
-    def __init__(self, model):
+    def __init__(self, model, stats=[]):
         self.model = model
+        self.stats = stats
         model.register(self)
 
     def start(self):
@@ -46,8 +50,8 @@ class View():
 
 
 class BasicView(View):
-    def __init__(self, model, params):
-        View.__init__(self, model)
+    def __init__(self, model, params, stats=[]):
+        View.__init__(self, model, stats)
         self.params = params
         info_fields = []
         for param in params:
@@ -56,24 +60,35 @@ class BasicView(View):
 
     def start(self):
         self.results = {}
+        self.stat_results = {}
+        self._num_sims = len(self.model._sim_ids)
+        for stat in self.stats:
+            self.stat_results[stat] = {}
         for param in self.params:
-            self._num_sims = len(self.model._sim_ids)
-            self.results[param] = [[] for x in range(self._num_sims)]
+            self.results[param.name] = [[] for x in range(self._num_sims)]
+            for stat in self.stats:
+                self.stat_results[stat][param.name] = [[] for x in
+                                                       range(self._num_sims)]
         self.fig = plt.figure(figsize=(16, 9))
 
     def complete_cycle(self, pop):
         for param in self.params:
             vals = param.get_values(pop)
-            if len(self.results[param][self._sim_id]) == 0:
+            if len(self.results[param.name][self._sim_id]) == 0:
                 for i in range(len(vals)):
-                    self.results[param][self._sim_id].append([vals[i]])
+                    self.results[param.name][self._sim_id].append([vals[i]])
             else:
                 for i in range(len(vals)):
-                    self.results[param][self._sim_id][i].append(vals[i])
+                    self.results[param.name][self._sim_id][i].append(vals[i])
+            for stat in self.stats:
+                if stat == 'mean':
+                    fun = statistics.mean
+                stat_dict = self.stat_results[stat][param.name][self._sim_id]
+                stat_dict.append(fun(vals))
 
     def end(self):
         for i, param in enumerate(self.params):
-            for sim_id, results in enumerate(self.results[param]):
+            for sim_id, results in enumerate(self.results[param.name]):
                 if sim_id == 0:
                     ax = self.fig.add_subplot(
                         len(self.params), self._num_sims,
@@ -85,12 +100,15 @@ class BasicView(View):
                         1 + i * self._num_sims + sim_id, sharey=ax1)
                 for my_case in results:
                     ax.plot(my_case)
+                for stat in self.stats:
+                    stat_dict = self.stat_results[stat][param.name]
+                    ax.plot(stat_dict[sim_id], 'k', lw=4)
         return self.fig
 
 
 class BasicViewTwo(View):
-    def __init__(self, model, param):
-        View.__init__(self, model)
+    def __init__(self, model, param, stats=[]):
+        View.__init__(self, model, stats)
         info_fields = []
         info_fields.extend(param.simupop_info)
         self.info_fields = list(set(info_fields))
@@ -134,3 +152,80 @@ class BasicViewTwo(View):
                 for my_case in results:
                     self.axs[i, j].plot(my_case)
         return self.fig
+
+
+class MetaVsDemeView(View):
+    def __init__(self, model, meta_param, deme_param, stats=[]):
+        View.__init__(self, model, stats)
+        self.meta_param = meta_param
+        self.deme_param = deme_param
+        self.params = [meta_param, deme_param]
+        info_fields = []
+        info_fields.extend(meta_param.simupop_info)
+        info_fields.extend(deme_param.simupop_info)
+        self.info_fields = list(set(info_fields))
+
+    def start(self):
+        # need to add stats
+        self._num_sims = len(self.model._sim_ids)
+        self.deme_results = [defaultdict(list) for x in range(self._num_sims)]
+        self.meta_results = [[] for x in range(self._num_sims)]
+
+    def complete_cycle(self, pop):
+        # need to add stats
+        for sub_pop in range(pop.numSubPop()):
+            vals = self.deme_param.get_values(pop, sub_pop)
+            if len(self.deme_results[self._sim_id][sub_pop]) == 0:
+                for i in range(len(vals)):
+                    self.deme_results[self._sim_id][sub_pop].append([vals[i]])
+            else:
+                for i in range(len(vals)):
+                    self.deme_results[self._sim_id][sub_pop][i].append(vals[i])
+
+        vals = self.meta_param.get_values(pop)
+        if len(self.meta_results[self._sim_id]) == 0:
+            for i in range(len(vals)):
+                self.meta_results[self._sim_id].append([vals[i]])
+        else:
+            for i in range(len(vals)):
+                self.meta_results[self._sim_id][i].append(vals[i])
+
+    def end(self):
+        max_sub_pops = max([len(self.deme_results[i]) for i in
+                            range(len(self.deme_results))])
+        fig, axs = plt.subplots(self._num_sims, 1 + max_sub_pops,
+                                sharex=True, sharey=True,
+                                squeeze=False, figsize=(16, 9))
+        y_min = float('inf')
+        y_max = float('-inf')
+        for i, param in enumerate(range(self._num_sims)):
+            n_sub_pops = len(self.deme_results[i])
+            ax = axs[i, 0]
+            ax.set_axis_bgcolor('0.9')
+            plt.setp(ax.get_yticklabels(), visible=False)
+            plt.setp(ax.get_xticklabels(), visible=False)
+            for my_case in self.meta_results[i]:
+                ax.plot(my_case)
+                if y_min > min(my_case):
+                    y_min = min(my_case)
+                if y_max < max(my_case):
+                    y_max = max(my_case)
+            ax.set_xlim(0, len(my_case))
+            for sp in range(n_sub_pops):
+                ax = axs[i, sp + 1]
+                plt.setp(ax.get_yticklabels(), visible=False)
+                plt.setp(ax.get_xticklabels(), visible=False)
+                for my_case in self.deme_results[i][sp]:
+                    ax.plot(my_case)
+                    if y_min > min(my_case):
+                        y_min = min(my_case)
+                    if y_max < max(my_case):
+                        y_max = max(my_case)
+
+        ax = axs[self._num_sims - 1, 0]
+        plt.setp(ax.get_yticklabels(), visible=True)
+        plt.setp(ax.get_xticklabels(), visible=True)
+        ax.set_ylim(y_min, y_max)
+        fig.subplots_adjust(hspace=0, wspace=0)
+
+        return fig

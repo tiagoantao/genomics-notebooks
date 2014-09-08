@@ -12,6 +12,7 @@
 
 import copy
 import inspect
+import math
 
 import numpy as np
 
@@ -55,17 +56,22 @@ class Model:
             sizes = [self.pop_size]
         else:
             sizes = self.pop_size
-        xs = 1 + len(sizes) // 3
-        ys = len(sizes) % 3
-        fig, axs = plt.subplots(xs, ys, squeeze=False)
+        sqr = math.sqrt(len(sizes))
+        xs = int(sqr)
+        ys = int(sqr)
+        if int(sqr) != sqr:
+            ys += 1
+        fig, axs = plt.subplots(ys, xs, squeeze=False)
         x_size = 2 * max(sizes)
         fig.suptitle('Single, constant sized populations')
+        x = y = 0
         for i, size in enumerate(sizes):
-            x = i // 3
-            y = i % 3
+            if y == ys:
+                y = 0
+                x += 1
             x_start = max(sizes) - size / 2
             x_end = max(sizes) + size / 2
-            ax = axs[x, y]
+            ax = axs[y, x]
             ax.plot([x_start, x_start], [0, 1], 'b')
             ax.plot([x_end, x_end], [0, 1], 'b')
             ax.text(x_size / 2, 0.5, 'Nc = %d' % size,
@@ -73,7 +79,8 @@ class Model:
             ax.set_xlim(0, x_size)
             ax.set_ylim(0, 1)
             ax.set_axis_off()
-            data = print_figure(fig, 'png')
+            y += 1
+        data = print_figure(fig, 'png')
         plt.close(fig)
         return data
 
@@ -331,14 +338,16 @@ class Island(Model):
                 'mating_scheme': sp.RandomMating()}
 
 
-class LociParameter():
-    def __init__(self):
+class Parameter():
+    def __init__(self, do_structured=False):
         self.name = None
         self.desc = None
         self.simupop_info = []
+        self.do_structured = do_structured
 
-    def get_values(self, pop):
-        raise NotImplementedError
+    def get_values(self, pop, sub_pop=0):
+        ind_values = self._get_values(pop, sub_pop)
+        return ind_values
 
     def set_pop(self, pop):
         # To set the operators (at start)
@@ -349,35 +358,43 @@ class LociParameter():
         return []
 
 
-class ObsHe(LociParameter):
+class ObsHe(Parameter):
     def __init__(self):
-        LociParameter.__init__(self)
+        Parameter.__init__(self)
         self.name = 'ObsHe'
         self.desc = 'Observed Heterozygozity'
         self.simupop_stats = [sp.Stat(heteroFreq=True)]
 
-    def get_values(self, pop):
+    def _get_values(self, pop):
         loci = list(pop.dvars().heteroFreq.keys())
         loci.sort()
         return [pop.dvars().heteroFreq[l] for l in loci]
 
 
-class ExpHe(LociParameter):
-    def __init__(self):
-        LociParameter.__init__(self)
+class ExpHe(Parameter):
+    def __init__(self, **kwargs):
+        Parameter.__init__(self, kwargs)
         self.name = 'ExpHe'
         self.desc = 'Expected Heterozygozity'
 
     @property
     def simupop_stats(self):
-        simupop_stats = [sp.Stat(alleleFreq=True,
-                                 subPops=[(i, 0) for i in
-                                          range(self.pop.numSubPop())],
-                                 vars=['alleleFreq_sp'])]
+        if self.do_structured:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(i, 0)
+                                              for i in
+                                              range(self.pop.numSubPop())],
+                                     vars=['alleleFreq_sp'])]
+        else:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     vars=['alleleFreq'])]
         return simupop_stats
 
-    def get_values(self, pop):
-        freqs = pop.dvars((1, 0)).alleleFreq
+    def _get_values(self, pop, sub_pop):
+        if self.do_structured:
+            freqs = pop.dvars((sub_pop, 0)).alleleFreq
+        else:
+            freqs = pop.dvars().alleleFreq
         loci = list(freqs.keys())
         loci.sort()
         expHe = []
@@ -390,14 +407,30 @@ class ExpHe(LociParameter):
         return expHe
 
 
-class NumAlleles(LociParameter):
-    def __init__(self):
-        LociParameter.__init__(self)
+class NumAlleles(Parameter):
+    def __init__(self, **kwargs):
+        Parameter.__init__(self, kwargs)
         self.name = 'NumAlleles'
         self.desc = 'Number of Alleles'
-        self.simupop_stats = [sp.Stat(alleleFreq=True)]
 
-    def get_values(self, pop):
+    @property
+    def simupop_stats(self):
+        if self.do_structured:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(i, 0)
+                                              for i in
+                                              range(self.pop.numSubPop())],
+                                     vars=['alleleNum_sp'])]
+        else:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     vars=['alleleNum'])]
+        return simupop_stats
+
+    def _get_values(self, pop, sub_pop):
+        if self.do_structured:
+            anum = pop.dvars((sub_pop, 0)).alleleNum
+        else:
+            anum = pop.dvars().alleleNum
         anum = pop.dvars().alleleNum
         loci = list(anum.keys())
         loci.sort()
@@ -405,40 +438,50 @@ class NumAlleles(LociParameter):
         return anums
 
 
-class FST(LociParameter):
-    def __init__(self):
-        LociParameter.__init__(self)
+class StructuredParameter(Parameter):
+    def __init__(self, **kwargs):
+        Parameter.__init__(self, kwargs, is_structured=True)
+
+
+class FST(StructuredParameter):
+    def __init__(self, **kwargs):
+        StructuredParameter.__init__(self)
         self.name = 'FST'
         self.desc = 'FST'
         self.simupop_stats = [sp.Stat(structure=sp.ALL_AVAIL)]
 
-    def get_values(self, pop):
+    @property
+    def simupop_stats(self):
+        simupop_stats = [sp.Stat(structure=sp.ALL_AVAIL)]
+        return simupop_stats
+
+    def _get_values(self, pop):
         fst = pop.dvars().F_st
         return [fst]
 
 
-class LDNe(LociParameter):
+class LDNe(Parameter):
     def __init__(self, pcrit=0.02):
-        LociParameter.__init__(self)
+        Parameter.__init__(self)
         self.name = 'LDNe'
         self.desc = 'LDNe'
         self.pcrit = pcrit
         self.simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
                                       vars='Ne_LD')]
 
-    def get_values(self, pop):
+    def _get_values(self, pop):
         ne = pop.dvars().Ne_LD
         return [ne[self.pcrit]]
 
 
-class FreqDerived(LociParameter):
+class FreqDerived(Parameter):
     def __init__(self):
-        LociParameter.__init__(self)
+        Parameter.__init__(self)
         self.name = 'FreqDerived'
         self.desc = 'Frequency of the Derived Allele'
         self.simupop_stats = [sp.Stat(alleleFreq=True)]
 
-    def get_values(self, pop):
+    def _get_values(self, pop):
         anum = pop.dvars().alleleFreq
         loci = list(anum.keys())
         loci.sort()
