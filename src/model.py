@@ -12,7 +12,14 @@
 
 import copy
 import inspect
+
 import numpy as np
+
+from IPython.core.pylabtools import print_figure
+from IPython.display import Image
+
+from matplotlib import pyplot as plt
+
 import simuOpt
 simuOpt.setOptions(gui=False, quiet=True)
 import simuPOP as sp
@@ -31,6 +38,7 @@ class Model:
         self._views = []
         self.pop_size = 100
         self.num_msats = 100
+        self.sample_size = None  # All individuals
         self._stats = set()
         self._info_fields = set()
         self._sim_ids = []
@@ -41,6 +49,37 @@ class Model:
 
     def add_stat(self, stat):
         self._stats.add(stat)
+
+    def _repr__png_(self):
+        if type(self.pop_size) == int:
+            sizes = [self.pop_size]
+        else:
+            sizes = self.pop_size
+        xs = 1 + len(sizes) // 3
+        ys = len(sizes) % 3
+        fig, axs = plt.subplots(xs, ys, squeeze=False)
+        x_size = 2 * max(sizes)
+        fig.suptitle('Single, constant sized populations')
+        for i, size in enumerate(sizes):
+            x = i // 3
+            y = i % 3
+            x_start = max(sizes) - size / 2
+            x_end = max(sizes) + size / 2
+            ax = axs[x, y]
+            ax.plot([x_start, x_start], [0, 1], 'b')
+            ax.plot([x_end, x_end], [0, 1], 'b')
+            ax.text(x_size / 2, 0.5, 'Nc = %d' % size,
+                    ha='center', va='top')
+            ax.set_xlim(0, x_size)
+            ax.set_ylim(0, 1)
+            ax.set_axis_off()
+            data = print_figure(fig, 'png')
+        plt.close(fig)
+        return data
+
+    @property
+    def png(self):
+        return Image(self._repr__png_(), embed=True)
 
     def _create_snp_genome(self, num_snps, freq):
         init_ops = []
@@ -136,6 +175,12 @@ class Model:
     def _run(self, sim_id, params):
         pr = self.prepare_sim(params)
         sim = pr['sim']
+        if params['sample_size'] is None:
+            pr['pop'].setVirtualSplitter(sp.ProportionSplitter(
+                proportions=[1]))
+        else:
+            pr['pop'].setVirtualSplitter(sp.RangeSplitter(
+                ranges=[[0, params['sample_size']]]))
         for view in self._views:
             view.set_sim_id(sim_id)
         sim.evolve(initOps=pr['init_ops'],
