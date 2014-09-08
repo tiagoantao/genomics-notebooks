@@ -27,11 +27,22 @@ class View():
     def set_sim_id(self, sim_id):
         self._sim_id = sim_id
 
+    def set_pop(self, pop):
+        self.pop = pop
+
     def complete_sim(self):
         pass
 
     def complete_cycle(self, pop):
         pass
+
+    @property
+    def view_ops(self):
+        view_ops = []
+        for param in self.params:
+            param.set_pop(self.pop)
+            view_ops.extend(param.simupop_stats)
+        return view_ops
 
 
 class BasicView(View):
@@ -39,10 +50,8 @@ class BasicView(View):
         View.__init__(self, model)
         self.params = params
         info_fields = []
-        self.post_ops = []
         for param in params:
             info_fields.extend(param.simupop_info)
-            self.post_ops.extend(param.simupop_stats)
         self.info_fields = list(set(info_fields))
 
     def start(self):
@@ -82,11 +91,11 @@ class BasicView(View):
 class BasicViewTwo(View):
     def __init__(self, model, param):
         View.__init__(self, model)
-        self.param = param
         info_fields = []
         info_fields.extend(param.simupop_info)
         self.info_fields = list(set(info_fields))
-        self.post_ops = param.simupop_stats
+        self.params = [param]
+        self.param = param
 
     def start(self):
         self.results = {}

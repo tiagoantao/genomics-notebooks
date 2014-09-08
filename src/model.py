@@ -111,22 +111,34 @@ class Model:
 
         return loci, init_ops
 
-    def _create_single_pop(self, pop_size, nloci):
+    def _create_single_pop(self, pop_size, nloci, sample_size):
         init_ops = []
         init_ops.append(sp.InitSex())
         pop = sp.Population(pop_size, ploidy=2, loci=[1] * nloci,
                             chromTypes=[sp.AUTOSOME] * nloci,
                             infoFields=list(self._info_fields))
+        if sample_size is None:
+            pop.setVirtualSplitter(sp.ProportionSplitter(
+                proportions=[1]))
+        else:
+            pop.setVirtualSplitter(sp.RangeSplitter(
+                ranges=[[0, sample_size]]))
         pre_ops = []
         post_ops = []
         return pop, init_ops, pre_ops, post_ops
 
-    def _create_island(self, pop_sizes, mig, nloci):
+    def _create_island(self, pop_sizes, mig, nloci, sample_size):
         init_ops = []
         init_ops.append(sp.InitSex())
         pop = sp.Population(pop_sizes, ploidy=2, loci=[1] * nloci,
                             chromTypes=[sp.AUTOSOME] * nloci,
                             infoFields=list(self._info_fields))
+        if sample_size is None:
+            pop.setVirtualSplitter(sp.ProportionSplitter(
+                proportions=[1]))
+        else:
+            pop.setVirtualSplitter(sp.RangeSplitter(
+                ranges=[[0, sample_size] * len(pop_sizes)]))
         post_ops = [sp.Migrator(
             demography.migrIslandRates(mig, len(pop_sizes)))]
         pre_ops = []
@@ -175,12 +187,6 @@ class Model:
     def _run(self, sim_id, params):
         pr = self.prepare_sim(params)
         sim = pr['sim']
-        if params['sample_size'] is None:
-            pr['pop'].setVirtualSplitter(sp.ProportionSplitter(
-                proportions=[1]))
-        else:
-            pr['pop'].setVirtualSplitter(sp.RangeSplitter(
-                ranges=[[0, params['sample_size']]]))
         for view in self._views:
             view.set_sim_id(sim_id)
         sim.evolve(initOps=pr['init_ops'],
@@ -209,16 +215,18 @@ class SinglePop(Model):
             for info in view.info_fields:
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
-            self._create_single_pop(params['pop_size'], params['num_msats'])
+            self._create_single_pop(params['pop_size'], params['num_msats'],
+                                    params['sample_size'])
         loci, genome_init = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
-            view_ops.extend(view.post_ops)
+            view.set_pop(pop)
+            view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
         sim = sp.Simulator(pop, 1, True)
-        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+        return {'sim': sim, 'init_ops': init_ops + genome_init,
                 'pre_ops': pre_ops, 'post_ops': post_ops,
                 'mating_scheme': sp.RandomMating()}
 
@@ -229,11 +237,13 @@ class Bottleneck(Model):
             for info in view.info_fields:
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
-            self._create_single_pop(params['start_size'], params['num_msats'])
+            self._create_single_pop(params['start_size'], params['num_msats'],
+                                    params['sample_size'])
         loci, genome_init = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
-            view_ops.extend(view.post_ops)
+            view.set_pop(pop)
+            view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
@@ -257,10 +267,12 @@ class SelectionPop(Model):
             for info in view.info_fields:
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
-            self._create_single_pop(params['pop_size'], 1)
+            self._create_single_pop(params['pop_size'], 1,
+                                    params['sample_size'])
         view_ops = []
         for view in self._views:
-            view_ops.extend(view.post_ops)
+            view.set_pop(pop)
+            view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
@@ -293,17 +305,23 @@ class Island(Model):
         self.num_pops = 5
         self.mig = 0.01
 
+    @property
+    def png(self):
+        return None
+
     def prepare_sim(self, params):
         for view in self._views:
             for info in view.info_fields:
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
             self._create_island([params['pop_size']] * params['num_pops'],
-                                params['mig'], params['num_msats'])
+                                params['mig'], params['num_msats'],
+                                params['sample_size'])
         loci, genome_init = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
-            view_ops.extend(view.post_ops)
+            view.set_pop(pop)
+            view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
@@ -318,10 +336,17 @@ class LociParameter():
         self.name = None
         self.desc = None
         self.simupop_info = []
-        self.simupop_stats = []
 
     def get_values(self, pop):
         raise NotImplementedError
+
+    def set_pop(self, pop):
+        # To set the operators (at start)
+        self.pop = pop
+
+    @property
+    def simupop_stats(self):
+        return []
 
 
 class ObsHe(LociParameter):
@@ -342,10 +367,17 @@ class ExpHe(LociParameter):
         LociParameter.__init__(self)
         self.name = 'ExpHe'
         self.desc = 'Expected Heterozygozity'
-        self.simupop_stats = [sp.Stat(alleleFreq=True)]
+
+    @property
+    def simupop_stats(self):
+        simupop_stats = [sp.Stat(alleleFreq=True,
+                                 subPops=[(i, 0) for i in
+                                          range(self.pop.numSubPop())],
+                                 vars=['alleleFreq_sp'])]
+        return simupop_stats
 
     def get_values(self, pop):
-        freqs = pop.dvars().alleleFreq
+        freqs = pop.dvars((1, 0)).alleleFreq
         loci = list(freqs.keys())
         loci.sort()
         expHe = []
