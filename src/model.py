@@ -469,11 +469,6 @@ class LDNe(Parameter):
     @property
     def simupop_stats(self):
         if self.do_structured:
-            simupop_stats = [sp.Stat(alleleFreq=True,
-                                     subPops=[(i, 0)
-                                              for i in
-                                              range(self.pop.numSubPop())],
-                                     vars=['alleleNum_sp'])]
             simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
                                      subPops=[(i, 0)
                                               for i in
@@ -493,14 +488,29 @@ class LDNe(Parameter):
 
 
 class FreqDerived(Parameter):
-    def __init__(self):
-        Parameter.__init__(self)
+    def __init__(self, **kwargs):
+        Parameter.__init__(self, kwargs)
         self.name = 'FreqDerived'
         self.desc = 'Frequency of the Derived Allele'
-        self.simupop_stats = [sp.Stat(alleleFreq=True)]
 
-    def _get_values(self, pop):
-        anum = pop.dvars().alleleFreq
+    @property
+    def simupop_stats(self):
+        if self.do_structured:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(i, 0)
+                                              for i in
+                                              range(self.pop.numSubPop())],
+                                     vars=['alleleFreq_sp'])]
+        else:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     vars='alleleFreq')]
+        return simupop_stats
+
+    def _get_values(self, pop, sub_pop):
+        if self.do_structured:
+            anum = pop.dvars().alleleFreq
+        else:
+            anum = pop.dvars((sub_pop, 0)).alleleFreq
         loci = list(anum.keys())
         loci.sort()
         anums = [anum[0][1]]
