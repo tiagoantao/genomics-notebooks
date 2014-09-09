@@ -70,7 +70,6 @@ class BasicView(View):
             for stat in self.stats:
                 self.stat_results[stat][param.name] = [[] for x in
                                                        range(self._num_sims)]
-        self.fig = plt.figure(figsize=(16, 9))
 
     def complete_cycle(self, pop):
         for param in self.params:
@@ -88,23 +87,27 @@ class BasicView(View):
                 stat_dict.append(fun(vals))
 
     def end(self):
+        vparam = list(self.model._variation_params.keys())[0]
+        fig, axs = plt.subplots(len(self.params), self._num_sims,
+                                sharex=True,
+                                figsize=(16, 9), squeeze=False)
         for i, param in enumerate(self.params):
             for sim_id, results in enumerate(self.results[param.name]):
-                if sim_id == 0:
-                    ax = self.fig.add_subplot(
-                        len(self.params), self._num_sims,
-                        1 + i * self._num_sims + sim_id)
-                    ax1 = ax
-                else:
-                    ax = self.fig.add_subplot(
-                        len(self.params), self._num_sims,
-                        1 + i * self._num_sims + sim_id, sharey=ax1)
+                ax = axs[i, sim_id]
+                if i == 0:
+                    cval = str(self.model._sim_ids[sim_id][vparam])
+                    ax.set_title('%s: %s' % (vparam, cval))
+                plt.setp(ax.get_xticklabels(), visible=False)
+                if sim_id != 0:
+                    plt.setp(ax.get_yticklabels(), visible=False)
                 for my_case in results:
                     ax.plot(my_case)
                 for stat in self.stats:
                     stat_dict = self.stat_results[stat][param.name]
                     ax.plot(stat_dict[sim_id], 'k', lw=4)
-        return self.fig
+        plt.setp(axs[len(self.params) - 1, 0].get_xticklabels(), visible=True)
+        fig.tight_layout()
+        return fig
 
 
 class BasicViewTwo(View):
@@ -122,11 +125,6 @@ class BasicViewTwo(View):
         self.results[self.param] = [[] for x in range(self._num_sims)]
         vparams = list(self.model._variation_params.keys())
         vparams.sort()
-        p1 = self.model._variation_params[vparams[0]]
-        p2 = self.model._variation_params[vparams[1]]
-        self.fig, self.axs = plt.subplots(len(p1), len(p2),
-                                          sharex=True, sharey=True,
-                                          figsize=(16, 9), squeeze=False)
 
     def complete_cycle(self, pop):
         vals = self.param.get_values(pop)
@@ -142,17 +140,33 @@ class BasicViewTwo(View):
         vparams.sort()
         p1 = self.model._variation_params[vparams[0]]
         p2 = self.model._variation_params[vparams[1]]
+        fig, axs = plt.subplots(len(p1), len(p2),
+                                sharex=True, sharey=True,
+                                figsize=(16, 9), squeeze=False)
         for i in range(len(p1)):
             for j in range(len(p2)):
-                sim_id = i * len(p2) + j
-                my_vars = {k: v for k, v in
-                           self.model._sim_ids[sim_id].items()
-                           if k in self.model._variation_params}
-                self.axs[i, j].set_title('%s' % my_vars)
+                ax = axs[i, j]
+                plt.setp(ax.get_yticklabels(), visible=False)
+                plt.setp(ax.get_xticklabels(), visible=False)
+                sim_id = j * len(p1) + i
+                if i == 0:
+                    cval = str(self.model._sim_ids[sim_id][vparams[1]])
+                    axs[i, j].set_title('%s: %s' % (vparams[1], cval))
                 results = self.results[self.param][sim_id]
                 for my_case in results:
-                    self.axs[i, j].plot(my_case)
-        return self.fig
+                    axs[i, j].plot(my_case)
+        plt.setp(axs[0, 0].get_yticklabels(), visible=True)
+        plt.setp(axs[len(p1) - 1, 0].get_xticklabels(), visible=True)
+        fig.tight_layout()
+        for i in range(len(p1)):
+            ax = axs[i, len(p2) - 1]
+            xmin, xmax = ax.get_xlim()
+            ymin, ymax = ax.get_ylim()
+            sim_id = (len(p2) - 1) * len(p1) + i
+            rval = str(self.model._sim_ids[sim_id][vparams[0]])
+            ax.text(xmax + 1, ymax, '%s: %s' % (vparams[0], rval),
+                    ha='left', va='top', rotation='vertical')
+        return fig
 
 
 class MetaVsDemeView(View):
