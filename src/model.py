@@ -56,7 +56,7 @@ class Model:
             sizes = [self.pop_size]
         else:
             sizes = self.pop_size
-        sqr = math.sqrt(len(sizes))
+        sqr = math.ceil(math.sqrt(len(sizes)))
         xs = int(sqr)
         ys = int(sqr)
         if int(sqr) != sqr:
@@ -508,9 +508,9 @@ class FreqDerived(Parameter):
 
     def _get_values(self, pop, sub_pop):
         if self.do_structured:
-            anum = pop.dvars().alleleFreq
-        else:
             anum = pop.dvars((sub_pop, 0)).alleleFreq
+        else:
+            anum = pop.dvars().alleleFreq
         loci = list(anum.keys())
         loci.sort()
         anums = [anum[0][1]]
