@@ -145,7 +145,7 @@ class Model:
                 proportions=[1]))
         else:
             pop.setVirtualSplitter(sp.RangeSplitter(
-                ranges=[[0, sample_size] * len(pop_sizes)]))
+                ranges=[[0, sample_size]]))
         post_ops = [sp.Migrator(
             demography.migrIslandRates(mig, len(pop_sizes)))]
         pre_ops = []
@@ -431,7 +431,6 @@ class NumAlleles(Parameter):
             anum = pop.dvars((sub_pop, 0)).alleleNum
         else:
             anum = pop.dvars().alleleNum
-        anum = pop.dvars().alleleNum
         loci = list(anum.keys())
         loci.sort()
         anums = [len(anum[l]) for l in loci]
@@ -440,7 +439,8 @@ class NumAlleles(Parameter):
 
 class StructuredParameter(Parameter):
     def __init__(self, **kwargs):
-        Parameter.__init__(self, kwargs, is_structured=True)
+        kwargs['do_structured'] = True
+        Parameter.__init__(self, kwargs)
 
 
 class FST(StructuredParameter):
@@ -448,30 +448,48 @@ class FST(StructuredParameter):
         StructuredParameter.__init__(self)
         self.name = 'FST'
         self.desc = 'FST'
-        self.simupop_stats = [sp.Stat(structure=sp.ALL_AVAIL)]
 
     @property
     def simupop_stats(self):
         simupop_stats = [sp.Stat(structure=sp.ALL_AVAIL)]
         return simupop_stats
 
-    def _get_values(self, pop):
+    def _get_values(self, pop, sub_pop):
         fst = pop.dvars().F_st
         return [fst]
 
 
 class LDNe(Parameter):
-    def __init__(self, pcrit=0.02):
-        Parameter.__init__(self)
+    def __init__(self, pcrit=0.02, **kwargs):
+        Parameter.__init__(self, kwargs)
         self.name = 'LDNe'
         self.desc = 'LDNe'
         self.pcrit = pcrit
-        self.simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
-                                      vars='Ne_LD')]
 
-    def _get_values(self, pop):
-        ne = pop.dvars().Ne_LD
-        return [ne[self.pcrit]]
+    @property
+    def simupop_stats(self):
+        if self.do_structured:
+            simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(i, 0)
+                                              for i in
+                                              range(self.pop.numSubPop())],
+                                     vars=['alleleNum_sp'])]
+            simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
+                                     subPops=[(i, 0)
+                                              for i in
+                                              range(self.pop.numSubPop())],
+                                     vars='Ne_LD_sp')]
+        else:
+            simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
+                                     vars='Ne_LD')]
+        return simupop_stats
+
+    def _get_values(self, pop, sub_pop):
+        if self.do_structured:
+            ne = pop.dvars((sub_pop, 0)).Ne_LD
+        else:
+            ne = pop.dvars().Ne_LD
+        return ne[self.pcrit]
 
 
 class FreqDerived(Parameter):

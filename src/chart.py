@@ -208,7 +208,7 @@ class MetaVsDemeView(View):
                 ax.plot(my_case)
                 if y_min > min(my_case):
                     y_min = min(my_case)
-                if y_max < max(my_case):
+                if max(my_case) != float('inf') and y_max < max(my_case):
                     y_max = max(my_case)
             ax.set_xlim(0, len(my_case))
             for sp in range(n_sub_pops):
@@ -219,7 +219,7 @@ class MetaVsDemeView(View):
                     ax.plot(my_case)
                     if y_min > min(my_case):
                         y_min = min(my_case)
-                    if y_max < max(my_case):
+                    if max(my_case) != float('inf') and y_max < max(my_case):
                         y_max = max(my_case)
 
         ax = axs[self._num_sims - 1, 0]
