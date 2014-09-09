@@ -17,9 +17,10 @@ import matplotlib.pyplot as plt
 
 
 class View():
-    def __init__(self, model, stats=[]):
+    def __init__(self, model, stats=[], max_y=None):
         self.model = model
         self.stats = stats
+        self.max_y = max_y
         model.register(self)
 
     def start(self):
@@ -50,8 +51,8 @@ class View():
 
 
 class BasicView(View):
-    def __init__(self, model, params, stats=[]):
-        View.__init__(self, model, stats)
+    def __init__(self, model, params, stats=[], max_y=None):
+        View.__init__(self, model, stats, max_y)
         self.params = params
         info_fields = []
         for param in params:
@@ -155,8 +156,8 @@ class BasicViewTwo(View):
 
 
 class MetaVsDemeView(View):
-    def __init__(self, model, meta_param, deme_param, stats=[]):
-        View.__init__(self, model, stats)
+    def __init__(self, model, meta_param, deme_param, stats=[], max_y=None):
+        View.__init__(self, model, stats, max_y)
         self.meta_param = meta_param
         self.deme_param = deme_param
         self.params = [meta_param, deme_param]
@@ -225,7 +226,10 @@ class MetaVsDemeView(View):
         ax = axs[self._num_sims - 1, 0]
         plt.setp(ax.get_yticklabels(), visible=True)
         plt.setp(ax.get_xticklabels(), visible=True)
-        ax.set_ylim(y_min, y_max)
+        if self.max_y is None:
+            ax.set_ylim(y_min, y_max)
+        else:
+            ax.set_ylim(y_min, self.max_y)
         fig.subplots_adjust(hspace=0, wspace=0)
 
         return fig
