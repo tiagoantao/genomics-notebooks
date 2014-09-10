@@ -387,6 +387,7 @@ class ExpHe(Parameter):
                                      vars=['alleleFreq_sp'])]
         else:
             simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(0, 0)],
                                      vars=['alleleFreq'])]
         return simupop_stats
 
@@ -423,6 +424,7 @@ class NumAlleles(Parameter):
                                      vars=['alleleNum_sp'])]
         else:
             simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(0, 0)],
                                      vars=['alleleNum'])]
         return simupop_stats
 
@@ -476,6 +478,7 @@ class LDNe(Parameter):
                                      vars='Ne_LD_sp')]
         else:
             simupop_stats = [sp.Stat(effectiveSize=sp.ALL_AVAIL,
+                                     subPops=[(0, 0)],
                                      vars='Ne_LD')]
         return simupop_stats
 
@@ -503,6 +506,7 @@ class FreqDerived(Parameter):
                                      vars=['alleleFreq_sp'])]
         else:
             simupop_stats = [sp.Stat(alleleFreq=True,
+                                     subPops=[(0, 0)],
                                      vars='alleleFreq')]
         return simupop_stats
 

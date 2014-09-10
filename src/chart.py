@@ -87,7 +87,11 @@ class BasicView(View):
                 stat_dict.append(fun(vals))
 
     def end(self):
-        vparam = list(self.model._variation_params.keys())[0]
+        try:
+            vparam = list(self.model._variation_params.keys())[0]
+        except IndexError:
+            # Single parameter, lets show pop_size
+            vparam = 'pop_size'
         fig, axs = plt.subplots(len(self.params), self._num_sims,
                                 sharex=True,
                                 figsize=(16, 9), squeeze=False)
