@@ -40,6 +40,7 @@ class Model:
         self._views = []
         self.pop_size = 100
         self.num_msats = 10
+        self.mut_msat = None
         self.sample_size = None  # All individuals
         self._stats = set()
         self._info_fields = set()
@@ -98,9 +99,10 @@ class Model:
 
         return loci, init_ops
 
-    def _create_genome(self, num_msats):
+    def _create_genome(self, num_msats, mut=None):
         init_ops = []
         loci = num_msats * [1]
+        pre_ops = []
         max_allele_msats = 100
         start_alleles = 10
 
@@ -116,8 +118,10 @@ class Model:
                                 2) + diri_list + [0.0] *
                                 ((max_allele_msats + 1 - 8) // 2),
                                 loci=msat))
+        if mut is not None:
+            pre_ops.append(sp.StepwiseMutator())
 
-        return loci, init_ops
+        return loci, init_ops, pre_ops
 
     def _create_single_pop(self, pop_size, nloci):
         init_ops = []
@@ -212,7 +216,8 @@ class SinglePop(Model):
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['pop_size'], params['num_msats'])
-        loci, genome_init = self._create_genome(params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(
+            params['num_msats'], params['mut_msat'])
         view_ops = []
         for view in self._views:
             view.set_pop(pop)
@@ -309,7 +314,7 @@ class Island(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_island([params['pop_size']] * params['num_pops'],
                                 params['mig'], params['num_msats'])
-        loci, genome_init = self._create_genome(params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
             view.set_pop(pop)
