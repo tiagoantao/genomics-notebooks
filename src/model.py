@@ -345,9 +345,9 @@ class Parameter():
 
     def get_values(self, pop, sub_pop=None):
         if self.do_structured:
-            pop_ = _get_sub_sample(pop, self.sample_size)
-        else:
             pop_ = _get_sub_sample(pop, self.sample_size, sub_pop)
+        else:
+            pop_ = _get_sub_sample(pop, self.sample_size)
         ind_values = self._get_values(pop_)
         return ind_values
 
