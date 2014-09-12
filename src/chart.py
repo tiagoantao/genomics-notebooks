@@ -96,6 +96,8 @@ class BasicView(View):
                                 sharex=True,
                                 figsize=(16, 9), squeeze=False)
         for i, param in enumerate(self.params):
+            min_param = None
+            max_param = None
             for sim_id, results in enumerate(self.results[param.name]):
                 ax = axs[i, sim_id]
                 if i == 0:
@@ -103,13 +105,20 @@ class BasicView(View):
                     ax.set_title('%s: %s' % (vparam, cval))
                 plt.setp(ax.get_xticklabels(), visible=False)
                 if sim_id != 0:
-                    pass
-                    #plt.setp(ax.get_yticklabels(), visible=False)
+                    plt.setp(ax.get_yticklabels(), visible=False)
                 for my_case in results:
                     ax.plot(my_case)
                 for stat in self.stats:
                     stat_dict = self.stat_results[stat][param.name]
                     ax.plot(stat_dict[sim_id], 'k', lw=4)
+                ymin, ymax = ax.get_ylim()
+                if min_param is None or ymin < min_param:
+                    min_param = ymin
+                if max_param is None or ymax > max_param:
+                    max_param = ymax
+            for sim_id, results in enumerate(self.results[param.name]):
+                ax = axs[i, sim_id]
+                ax.set_ylim(min_param, max_param)
         plt.setp(axs[len(self.params) - 1, 0].get_xticklabels(), visible=True)
         fig.tight_layout()
         return fig
