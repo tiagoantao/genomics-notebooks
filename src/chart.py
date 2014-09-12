@@ -103,7 +103,8 @@ class BasicView(View):
                     ax.set_title('%s: %s' % (vparam, cval))
                 plt.setp(ax.get_xticklabels(), visible=False)
                 if sim_id != 0:
-                    plt.setp(ax.get_yticklabels(), visible=False)
+                    pass
+                    #plt.setp(ax.get_yticklabels(), visible=False)
                 for my_case in results:
                     ax.plot(my_case)
                 for stat in self.stats:
@@ -154,8 +155,8 @@ class BasicViewTwo(View):
                 plt.setp(ax.get_xticklabels(), visible=False)
                 sim_id = j * len(p1) + i
                 if i == 0:
-                    cval = str(self.model._sim_ids[sim_id][vparams[1]])
-                    axs[i, j].set_title('%s: %s' % (vparams[1], cval))
+                    cval = str(self.model._sim_ids[sim_id][vparams[0]])
+                    axs[i, j].set_title('%s: %s' % (vparams[0], cval))
                 results = self.results[self.param][sim_id]
                 for my_case in results:
                     axs[i, j].plot(my_case)
@@ -167,8 +168,8 @@ class BasicViewTwo(View):
             xmin, xmax = ax.get_xlim()
             ymin, ymax = ax.get_ylim()
             sim_id = (len(p2) - 1) * len(p1) + i
-            rval = str(self.model._sim_ids[sim_id][vparams[0]])
-            ax.text(xmax + 1, ymax, '%s: %s' % (vparams[0], rval),
+            rval = str(self.model._sim_ids[sim_id][vparams[1]])
+            ax.text(xmax + 1, ymax, '%s: %s' % (vparams[1], rval),
                     ha='left', va='top', rotation='vertical')
         return fig
 
