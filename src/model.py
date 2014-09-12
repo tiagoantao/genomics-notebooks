@@ -119,7 +119,7 @@ class Model:
                                 ((max_allele_msats + 1 - 8) // 2),
                                 loci=msat))
         if mut is not None:
-            pre_ops.append(sp.StepwiseMutator())
+            pre_ops.append(sp.StepwiseMutator(rates=mut))
 
         return loci, init_ops, pre_ops
 
@@ -227,7 +227,7 @@ class SinglePop(Model):
         post_ops = view_ops + post_ops
         sim = sp.Simulator(pop, 1, True)
         return {'sim': sim, 'init_ops': init_ops + genome_init,
-                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'pre_ops': pre_ops + gpre_ops, 'post_ops': post_ops,
                 'mating_scheme': sp.RandomMating()}
 
 
@@ -238,7 +238,7 @@ class Bottleneck(Model):
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['start_size'], params['num_msats'])
-        loci, genome_init = self._create_genome(params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
             view.set_pop(pop)
@@ -251,7 +251,7 @@ class Bottleneck(Model):
             proportions=(params['end_size'] / params['start_size'],),
             at=params['bgen']))
         return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
-                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'pre_ops': pre_ops + gpre_ops, 'post_ops': post_ops,
                 'mating_scheme': sp.RandomMating()}
 
 
