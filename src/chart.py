@@ -51,8 +51,9 @@ class View():
 
 
 class BasicView(View):
-    def __init__(self, model, params, stats=[], max_y=None):
+    def __init__(self, model, params, stats=[], max_y=None, with_model=False):
         View.__init__(self, model, stats, max_y)
+        self.with_model = with_model
         self.params = params
         info_fields = []
         for param in params:
@@ -92,14 +93,22 @@ class BasicView(View):
         except IndexError:
             # Single parameter, lets show pop_size
             vparam = 'pop_size'
-        fig, axs = plt.subplots(len(self.params), self._num_sims,
-                                sharex=True,
+        fig, axs = plt.subplots(len(self.params) +
+                                (1 if self.with_model else 0),
+                                self._num_sims,
                                 figsize=(16, 9), squeeze=False)
+        if self.with_model:
+            for i, param in enumerate(self.model._sim_ids):
+                ax = axs[0, i]
+                self.model._draw_sim(ax, param)
         for i, param in enumerate(self.params):
             min_param = None
             max_param = None
             for sim_id, results in enumerate(self.results[param.name]):
-                ax = axs[i, sim_id]
+                if self.with_model:
+                    ax = axs[i + 1, sim_id]
+                else:
+                    ax = axs[i, sim_id]
                 if i == 0:
                     cval = str(self.model._sim_ids[sim_id][vparam])
                     ax.set_title('%s: %s' % (vparam, cval))
@@ -117,7 +126,10 @@ class BasicView(View):
                 if max_param is None or ymax > max_param:
                     max_param = ymax
             for sim_id, results in enumerate(self.results[param.name]):
-                ax = axs[i, sim_id]
+                if self.with_model:
+                    ax = axs[i + 1, sim_id]
+                else:
+                    ax = axs[i, sim_id]
                 ax.set_ylim(min_param, max_param)
         plt.setp(axs[len(self.params) - 1, 0].get_xticklabels(), visible=True)
         fig.tight_layout()
