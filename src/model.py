@@ -336,12 +336,25 @@ class Island(Model):
     def _draw_sim(self, ax, sim_params):
         graph = nx.Graph()
         num_pops = sim_params['num_pops']
+        gnames = ['P%d: %d' % (g + 1, sim_params['pop_size'], )
+                  for g in range(num_pops)]
         for g in range(num_pops):
-            graph.add_node(g + 1)
-        for g1 in range(1, num_pops):
-            for g2 in range(g1 + 1, num_pops + 1):
-                graph.add_edge(g1, g2)
-        nx.draw_circular(graph, ax=ax)
+            graph.add_node(gnames[g])
+        for g1 in range(num_pops - 1):
+            for g2 in range(g1 + 1, num_pops):
+                graph.add_edge(gnames[g1], gnames[g2])
+        nx.draw_circular(graph, node_color='c', ax=ax)
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+        pos = ymin
+        for var in self._variation_params:
+            if var == 'mig':
+                continue
+            ax.text(xmin, pos, '%s: %d' % (var, int(sim_params[var])),
+                    va='top', ha='left')
+            pos = (ymax - ymin) / 2 + ymin
+        ax.text(xmin, ymax, 'mig: %f' % sim_params['mig'],
+                va='top', ha='left')
 
 
 def _get_sub_sample(pop, size, sub_pop=None):
