@@ -101,6 +101,11 @@ class BasicView(View):
             for i, param in enumerate(self.model._sim_ids):
                 ax = axs[0, i]
                 self.model._draw_sim(ax, param)
+                cval = str(param[vparam])
+                ax.set_title('%s: %s' % (vparam, cval))
+                if i != 0:
+                    plt.setp(ax.get_yticklabels(), visible=False)
+                    plt.setp(ax.get_xticklabels(), visible=False)
         for i, param in enumerate(self.params):
             min_param = None
             max_param = None
@@ -109,9 +114,9 @@ class BasicView(View):
                     ax = axs[i + 1, sim_id]
                 else:
                     ax = axs[i, sim_id]
-                if i == 0:
-                    cval = str(self.model._sim_ids[sim_id][vparam])
-                    ax.set_title('%s: %s' % (vparam, cval))
+                    if i == 0:
+                        cval = str(self.model._sim_ids[sim_id][vparam])
+                        ax.set_title('%s: %s' % (vparam, cval))
                 plt.setp(ax.get_xticklabels(), visible=False)
                 if sim_id != 0:
                     plt.setp(ax.get_yticklabels(), visible=False)
@@ -131,7 +136,9 @@ class BasicView(View):
                 else:
                     ax = axs[i, sim_id]
                 ax.set_ylim(min_param, max_param)
-        plt.setp(axs[len(self.params) - 1, 0].get_xticklabels(), visible=True)
+        if not self.with_model:
+            plt.setp(axs[len(self.params) - 1, 0].get_xticklabels(),
+                     visible=True)
         fig.tight_layout()
         return fig
 
