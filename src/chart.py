@@ -144,13 +144,14 @@ class BasicView(View):
 
 
 class BasicViewTwo(View):
-    def __init__(self, model, param, stats=[]):
+    def __init__(self, model, param, stats=[], highlight=None):
         View.__init__(self, model, stats)
         info_fields = []
         info_fields.extend(param.simupop_info)
         self.info_fields = list(set(info_fields))
         self.params = [param]
         self.param = param
+        self.highlight = highlight
 
     def start(self):
         self.results = {}
@@ -169,35 +170,42 @@ class BasicViewTwo(View):
                 self.results[self.param][self._sim_id][i].append(vals[i])
 
     def end(self):
+        def get_sim_id(p1, v1, p2, v2):
+            for i, sim_params in enumerate(self.model._sim_ids):
+                if sim_params[p1] == v1 and sim_params[p2] == v2:
+                    return i
         vparams = list(self.model._variation_params.keys())
         vparams.sort()
         p1 = self.model._variation_params[vparams[0]]
         p2 = self.model._variation_params[vparams[1]]
-        fig, axs = plt.subplots(len(p1), len(p2),
+        fig, axs = plt.subplots(len(p2), len(p1),
                                 sharex=True, sharey=True,
                                 figsize=(16, 9), squeeze=False)
         for i in range(len(p1)):
+            v1 = p1[i]
             for j in range(len(p2)):
-                ax = axs[i, j]
+                v2 = p2[j]
+                ax = axs[j, i]
                 plt.setp(ax.get_yticklabels(), visible=False)
                 plt.setp(ax.get_xticklabels(), visible=False)
-                sim_id = j * len(p1) + i
-                if i == 0:
+                sim_id = get_sim_id(vparams[0], v1, vparams[1], v2)
+                if j == 0:
                     cval = str(self.model._sim_ids[sim_id][vparams[0]])
-                    axs[i, j].set_title('%s: %s' % (vparams[0], cval))
+                    axs[j, i].set_title('%s: %s' % (vparams[0], cval))
                 results = self.results[self.param][sim_id]
-                for my_case in results:
-                    axs[i, j].plot(my_case)
+                for l, my_case in enumerate(results):
+                    if self.highlight is None or l in self.highlight:
+                        axs[j, i].plot(my_case)
+                    else:
+                        axs[j, i].plot(my_case, 'k', lw=0.5)
         plt.setp(axs[0, 0].get_yticklabels(), visible=True)
-        plt.setp(axs[len(p1) - 1, 0].get_xticklabels(), visible=True)
+        plt.setp(axs[0, len(p1) - 1].get_xticklabels(), visible=True)
         fig.tight_layout()
-        for i in range(len(p1)):
-            ax = axs[i, len(p2) - 1]
+        for j in range(len(p2)):
+            ax = axs[j, len(p1) - 1]
             xmin, xmax = ax.get_xlim()
             ymin, ymax = ax.get_ylim()
-            sim_id = (len(p2) - 1) * len(p1) + i
-            rval = str(self.model._sim_ids[sim_id][vparams[1]])
-            ax.text(xmax + 1, ymax, '%s: %s' % (vparams[1], rval),
+            ax.text(xmax + 1, ymax, '%s: %s' % (vparams[1], p2[j]),
                     ha='left', va='top', rotation='vertical')
         return fig
 
