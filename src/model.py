@@ -16,16 +16,16 @@ import math
 import random
 
 import numpy as np
-
-from IPython.core.pylabtools import print_figure
-from IPython.display import Image
-
+import networkx as nx
 from matplotlib import pyplot as plt
 
 import simuOpt
 simuOpt.setOptions(gui=False, quiet=True)
 import simuPOP as sp
 from simuPOP import demography
+
+from IPython.core.pylabtools import print_figure
+from IPython.display import Image
 
 
 def _hook_view(pop, param):
@@ -54,37 +54,47 @@ class Model:
         self._stats.add(stat)
 
     def _repr__png_(self):
-        if type(self.pop_size) == int:
-            sizes = [self.pop_size]
+        param_order = list(self._variation_params.keys())
+        param_order.sort()
+        if len(self._variation_params) == 0:
+            ys = 1
+            xs = 1
+        elif len(self._variation_params) == 1:
+            p1 = param_order[0]
+            vals = self._variation_params[p1]
+            xs = min([3, len(vals)])
+            ys = math.ceil(len(vals) / 3)
         else:
-            sizes = self.pop_size
-        sqr = math.ceil(math.sqrt(len(sizes)))
-        xs = int(sqr)
-        ys = int(sqr)
-        if int(sqr) != sqr:
-            ys += 1
-        fig, axs = plt.subplots(ys, xs, squeeze=False)
-        x_size = 2 * max(sizes)
-        fig.suptitle('Single, constant sized populations')
-        x = y = 0
-        for i, size in enumerate(sizes):
-            if y == ys:
-                y = 0
-                x += 1
-            x_start = max(sizes) - size / 2
-            x_end = max(sizes) + size / 2
+            p1 = param_order[0]
+            p2 = param_order[1]
+            xs = len(self._variation_params[p1])
+            ys = len(self._variation_params[p2])
+        fig, axs = plt.subplots(ys, xs, squeeze=False, figsize=(16, 9))
+        for i, sim_params in enumerate(self._sim_ids):
+            x = i % 3
+            y = i // 3
             ax = axs[y, x]
-            ax.plot([x_start, x_start], [0, 1], 'b')
-            ax.plot([x_end, x_end], [0, 1], 'b')
-            ax.text(x_size / 2, 0.5, 'Nc = %d' % size,
-                    ha='center', va='top')
-            ax.set_xlim(0, x_size)
-            ax.set_ylim(0, 1)
+            self._draw_sim(ax, sim_params)
+        for i in range(i + 1, ys * xs):
+            x = i % 3
+            y = i // 3
+            ax = axs[y, x]
             ax.set_axis_off()
-            y += 1
         data = print_figure(fig, 'png')
         plt.close(fig)
         return data
+
+    def _draw_sim(self, ax, sim_params):
+        pop_size = sim_params['pop_size']
+        ax.plot([0, self._gens], [0, 0], 'b')
+        ax.plot([0, self._gens], [pop_size, pop_size], 'b')
+        ax.set_xlim(0, self._gens)
+        ax.set_axis_off()
+        if type(self.pop_size) == list:
+            pop_sizes = self.pop_size
+        else:
+            pop_sizes = [self.pop_size]
+        ax.set_ylim(-10, 1.1 * max(pop_sizes))
 
     @property
     def png(self):
@@ -303,10 +313,6 @@ class Island(Model):
         self.num_pops = 5
         self.mig = 0.01
 
-    @property
-    def png(self):
-        return None
-
     def prepare_sim(self, params):
         for view in self._views:
             for info in view.info_fields:
@@ -326,6 +332,16 @@ class Island(Model):
         return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
                 'pre_ops': pre_ops, 'post_ops': post_ops,
                 'mating_scheme': sp.RandomMating()}
+
+    def _draw_sim(self, ax, sim_params):
+        graph = nx.Graph()
+        num_pops = sim_params['num_pops']
+        for g in range(num_pops):
+            graph.add_node(g + 1)
+        for g1 in range(1, num_pops):
+            for g2 in range(g1 + 1, num_pops + 1):
+                graph.add_edge(g1, g2)
+        nx.draw_circular(graph, ax=ax)
 
 
 def _get_sub_sample(pop, size, sub_pop=None):
