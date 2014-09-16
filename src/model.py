@@ -288,13 +288,15 @@ class SelectionPop(Model):
         Model.__init__(self, gens)
         self.sel = 0.01
         self.freq = 0.01
+        self.neutral_loci = 0
 
     def prepare_sim(self, params):
         for view in self._views:
             for info in view.info_fields:
                 self._info_fields.add(info)
+        nloci = 1 + params['neutral_loci']
         pop, init_ops, pre_ops, post_ops = \
-            self._create_single_pop(params['pop_size'], 1)
+            self._create_single_pop(params['pop_size'], nloci)
         view_ops = []
         for view in self._views:
             view.set_pop(pop)
@@ -302,7 +304,7 @@ class SelectionPop(Model):
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
-        loci, genome_init = self._create_snp_genome(1, freq=params['freq'])
+        loci, genome_init = self._create_snp_genome(nloci, freq=params['freq'])
         sim = sp.Simulator(pop, 1, True)
         if params['sel_type'] == 'hz_advantage':
             ms = sp.MapSelector(loci=0, fitness={
@@ -517,5 +519,5 @@ class FreqDerived(Parameter):
         anum = pop.dvars().alleleFreq
         loci = list(anum.keys())
         loci.sort()
-        anums = [anum[0][1]]
+        anums = [anum[l][1] for l in loci]
         return anums
