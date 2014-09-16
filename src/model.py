@@ -84,18 +84,6 @@ class Model:
         plt.close(fig)
         return data
 
-    def _draw_sim(self, ax, sim_params):
-        pop_size = sim_params['pop_size']
-        ax.plot([0, self._gens], [0, 0], 'b')
-        ax.plot([0, self._gens], [pop_size, pop_size], 'b')
-        ax.set_xlim(0, self._gens)
-        ax.set_axis_off()
-        if type(self.pop_size) == list:
-            pop_sizes = self.pop_size
-        else:
-            pop_sizes = [self.pop_size]
-        ax.set_ylim(-10, 1.1 * max(pop_sizes))
-
     @property
     def png(self):
         return Image(self._repr__png_(), embed=True)
@@ -240,6 +228,17 @@ class SinglePop(Model):
                 'pre_ops': pre_ops + gpre_ops, 'post_ops': post_ops,
                 'mating_scheme': sp.RandomMating()}
 
+    def _draw_sim(self, ax, sim_params):
+        pop_size = sim_params['pop_size']
+        ax.plot([0, self._gens], [0, 0], 'b')
+        ax.plot([0, self._gens], [pop_size, pop_size], 'b')
+        ax.set_xlim(0, self._gens)
+        if type(self.pop_size) == list:
+            pop_sizes = self.pop_size
+        else:
+            pop_sizes = [self.pop_size]
+        ax.set_ylim(-10, 1.1 * max(pop_sizes))
+
 
 class Bottleneck(Model):
     def prepare_sim(self, params):
@@ -263,6 +262,25 @@ class Bottleneck(Model):
         return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
                 'pre_ops': pre_ops + gpre_ops, 'post_ops': post_ops,
                 'mating_scheme': sp.RandomMating()}
+
+    def _draw_sim(self, ax, sim_params):
+        start_size = sim_params['start_size']
+        end_size = sim_params['end_size']
+        bgen = sim_params['bgen']
+        ax.plot([0, self._gens], [0, 0], 'b')
+        ax.plot([0, bgen], [start_size, start_size], 'b')
+        ax.plot([bgen, bgen], [start_size, end_size], 'b')
+        ax.plot([bgen, self._gens], [end_size, end_size], 'b')
+        ax.set_xlim(0, self._gens)
+        if type(self.start_size) == list:
+            pop_sizes = self.start_size
+        else:
+            pop_sizes = [self.start_size]
+        if type(self.end_size) == list:
+            pop_sizes.extend(self.end_size)
+        else:
+            pop_sizes.append(self.end_size)
+        ax.set_ylim(-10, 1.1 * max(pop_sizes))
 
 
 class SelectionPop(Model):
