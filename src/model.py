@@ -385,7 +385,7 @@ def _get_sub_sample(pop, size, sub_pop=None):
     if size is None:
         return pop_s
     rem_inds = random.sample(range(pop.popSize()), pop.popSize() - size)
-    pop_s.removeIndviduals(rem_inds)
+    pop_s.removeIndividuals(rem_inds)
     return pop_s
 
 
@@ -472,6 +472,20 @@ class NumAlleles(Parameter):
         loci.sort()
         anums = [len(anum[l]) for l in loci]
         return anums
+
+
+class fst(Parameter):
+    def __init__(self, **kwargs):
+        StructuredParameter.__init__(self)
+        self.name = 'fst'
+        self.desc = 'FST per locus'
+
+    def _get_values(self, pop):
+        st = sp.Stat(structure=sp.ALL_AVAIL, vars=['f_st'])
+        st.apply(pop)
+        fsts = pop.dvars().f_st
+        loci = list(fsts.keys())
+        return [fsts[l] for l in loci]
 
 
 class StructuredParameter(Parameter):
