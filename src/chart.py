@@ -74,6 +74,7 @@ class BasicView(View):
 
     def complete_cycle(self, pop):
         for param in self.params:
+            param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
             vals = param.get_values(pop)
             if len(self.results[param.name][self._sim_id]) == 0:
                 for i in range(len(vals)):
@@ -161,6 +162,7 @@ class BasicViewTwo(View):
         vparams.sort()
 
     def complete_cycle(self, pop):
+        self.param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
         vals = self.param.get_values(pop)
         if len(self.results[self.param][self._sim_id]) == 0:
             for i in range(len(vals)):
@@ -229,6 +231,8 @@ class MetaVsDemeView(View):
 
     def complete_cycle(self, pop):
         # need to add stats
+        self.deme_param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
+        self.meta_param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
         for sub_pop in range(pop.numSubPop()):
             vals = self.deme_param.get_values(pop, sub_pop)
             if len(self.deme_results[self._sim_id][sub_pop]) == 0:
