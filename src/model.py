@@ -23,6 +23,7 @@ import simuOpt
 simuOpt.setOptions(gui=False, quiet=True)
 import simuPOP as sp
 from simuPOP import demography
+from simuPOP import sampling
 
 from IPython.core.pylabtools import print_figure
 from IPython.display import Image
@@ -379,13 +380,12 @@ class Island(Model):
 
 def _get_sub_sample(pop, size, sub_pop=None):
     if sub_pop is None:
-        pop_s = pop.clone()
+        pop_s = pop
     else:
         pop_s = pop.extractSubPops(subPops=[sub_pop])
     if size is None:
         return pop_s
-    rem_inds = random.sample(range(pop.popSize()), pop.popSize() - size)
-    pop_s.removeIndividuals(rem_inds)
+    pop_s = sampling.drawRandomSample(pop_s, sizes=size)
     return pop_s
 
 
