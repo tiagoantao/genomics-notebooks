@@ -17,6 +17,7 @@ import math
 import numpy as np
 import networkx as nx
 from matplotlib import pyplot as plt
+from matplotlib.patches import Ellipse
 
 import simuOpt
 simuOpt.setOptions(gui=False, quiet=True)
@@ -158,7 +159,7 @@ class Model:
                                                     len(pop_sizes[0])))]
         init_ops = []
         init_ops.append(sp.InitSex())
-        pop = sp.Population(pop_sizes, ploidy=2, loci=[1] * nloci,
+        pop = sp.Population(flat_pop_sizes, ploidy=2, loci=[1] * nloci,
                             chromTypes=[sp.AUTOSOME] * nloci,
                             infoFields=list(self._info_fields))
         pre_ops = []
@@ -400,7 +401,7 @@ class Island(Model):
 
 
 class SteppingStone(Model):
-    def __init__(self, gens, two_d):
+    def __init__(self, gens, two_d=False):
         Model.__init__(self, gens)
         self.num_pops_x = 5
         self.mig = 0.01
@@ -414,13 +415,13 @@ class SteppingStone(Model):
             if self._two_d:
                 pop, init_ops, pre_ops, post_ops = \
                     self._create_stepping_stone(
-                        [params['pop_size']] * params['num_pops'],
+                        [[params['pop_size']] * params['num_pops_x']] *
+                        params['num_pops_y'],
                         params['mig'], params['num_msats'])
             else:
                 pop, init_ops, pre_ops, post_ops = \
                     self._create_stepping_stone(
-                        [[params['pop_size']] * params['num_pops_x']] *
-                        params['num_pops_y'],
+                        [[params['pop_size']] * params['num_pops_x']],
                         params['mig'], params['num_msats'])
         loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
@@ -436,27 +437,21 @@ class SteppingStone(Model):
                 'mating_scheme': sp.RandomMating()}
 
     def _draw_sim(self, ax, sim_params):
-        graph = nx.Graph()
-        num_pops = sim_params['num_pops']
-        gnames = ['P%d: %d' % (g + 1, sim_params['pop_size'], )
-                  for g in range(num_pops)]
-        for g in range(num_pops):
-            graph.add_node(gnames[g])
-        for g1 in range(num_pops - 1):
-            for g2 in range(g1 + 1, num_pops):
-                graph.add_edge(gnames[g1], gnames[g2])
-        nx.draw_circular(graph, node_color='c', ax=ax)
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
-        pos = ymin
-        for var in self._variation_params:
-            if var == 'mig':
-                continue
-            ax.text(xmin, pos, '%s: %d' % (var, int(sim_params[var])),
-                    va='top', ha='left')
-            pos = (ymax - ymin) / 2 + ymin
-        ax.text(xmin, ymax, 'mig: %f' % sim_params['mig'],
-                va='top', ha='left')
+        if self._two_d:
+            y = sim_params['num_pops_y']
+        else:
+            y = 1
+        ax.set_axis_off()
+        ax.set_ylim(0, 1 + y)
+        ax.set_xlim(0, 1 + sim_params['num_pops_x'])
+        for j in range(y):
+            for i in range(sim_params['num_pops_x']):
+                el = Ellipse((i + 1, j + 1), 0.5, 0.5, ec="none")
+                ax.add_patch(el)
+                if i > 0:
+                    ax.plot([i + .25, i + .75], [j + 1, j + 1], 'k')
+                if j > 0:
+                    ax.plot([i + 1, i + 1], [j + .25, j + .75], 'k')
 
 
 def _get_sub_sample(pop, size, sub_pop=None):
