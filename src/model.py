@@ -13,7 +13,6 @@
 import copy
 import inspect
 import math
-import random
 
 import numpy as np
 import networkx as nx
@@ -140,6 +139,28 @@ class Model:
                             infoFields=list(self._info_fields))
         post_ops = [sp.Migrator(
             demography.migrIslandRates(mig, len(pop_sizes)))]
+        pre_ops = []
+        self._info_fields.add('migrate_to')
+        return pop, init_ops, pre_ops, post_ops
+
+    def _create_stepping_stone(self, pop_sizes, mig, nloci):
+        if len(pop_sizes) == 1:
+            flat_pop_sizes = pop_sizes[0]
+            post_ops = [sp.Migrator(
+                demography.migrSteppingStoneRates(mig, len(flat_pop_sizes)))]
+        else:
+            flat_pop_sizes = []
+            for line in pop_sizes:
+                flat_pop_sizes.extend(line)
+            post_ops = [sp.Migrator(
+                demography.migr2DSteppingStoneRates(mig,
+                                                    len(pop_sizes),
+                                                    len(pop_sizes[0])))]
+        init_ops = []
+        init_ops.append(sp.InitSex())
+        pop = sp.Population(pop_sizes, ploidy=2, loci=[1] * nloci,
+                            chromTypes=[sp.AUTOSOME] * nloci,
+                            infoFields=list(self._info_fields))
         pre_ops = []
         self._info_fields.add('migrate_to')
         return pop, init_ops, pre_ops, post_ops
@@ -341,6 +362,66 @@ class Island(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_island([params['pop_size']] * params['num_pops'],
                                 params['mig'], params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
+        view_ops = []
+        for view in self._views:
+            view.set_pop(pop)
+            view_ops.extend(view.view_ops)
+        for view in self._views:
+            post_ops.append(sp.PyOperator(func=_hook_view, param=view))
+        post_ops = view_ops + post_ops
+        sim = sp.Simulator(pop, 1, True)
+        return {'sim': sim, 'pop': pop, 'init_ops': init_ops + genome_init,
+                'pre_ops': pre_ops, 'post_ops': post_ops,
+                'mating_scheme': sp.RandomMating()}
+
+    def _draw_sim(self, ax, sim_params):
+        graph = nx.Graph()
+        num_pops = sim_params['num_pops']
+        gnames = ['P%d: %d' % (g + 1, sim_params['pop_size'], )
+                  for g in range(num_pops)]
+        for g in range(num_pops):
+            graph.add_node(gnames[g])
+        for g1 in range(num_pops - 1):
+            for g2 in range(g1 + 1, num_pops):
+                graph.add_edge(gnames[g1], gnames[g2])
+        nx.draw_circular(graph, node_color='c', ax=ax)
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+        pos = ymin
+        for var in self._variation_params:
+            if var == 'mig':
+                continue
+            ax.text(xmin, pos, '%s: %d' % (var, int(sim_params[var])),
+                    va='top', ha='left')
+            pos = (ymax - ymin) / 2 + ymin
+        ax.text(xmin, ymax, 'mig: %f' % sim_params['mig'],
+                va='top', ha='left')
+
+
+class SteppingStone(Model):
+    def __init__(self, gens, two_d):
+        Model.__init__(self, gens)
+        self.num_pops_x = 5
+        self.mig = 0.01
+        self._two_d = two_d
+        self.num_pops_y = None
+
+    def prepare_sim(self, params):
+        for view in self._views:
+            for info in view.info_fields:
+                self._info_fields.add(info)
+            if self._two_d:
+                pop, init_ops, pre_ops, post_ops = \
+                    self._create_stepping_stone(
+                        [params['pop_size']] * params['num_pops'],
+                        params['mig'], params['num_msats'])
+            else:
+                pop, init_ops, pre_ops, post_ops = \
+                    self._create_stepping_stone(
+                        [[params['pop_size']] * params['num_pops_x']] *
+                        params['num_pops_y'],
+                        params['mig'], params['num_msats'])
         loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
