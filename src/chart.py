@@ -292,3 +292,102 @@ class MetaVsDemeView(View):
         fig.subplots_adjust(hspace=0, wspace=0)
 
         return fig
+
+
+class IndividualView():
+    # XXX merge with view
+    def __init__(self, model, param, step=10, with_model=False):
+        self.model = model
+        model.register(self)
+        info_fields = []
+        info_fields.extend(param.simupop_info)
+        self.info_fields = list(set(info_fields))
+        self.param = param
+        self.params = [param]
+        self.gen = 0
+        self.step = step
+        self.with_model = with_model
+
+    def set_sim_id(self, sim_id):
+        self._sim_id = sim_id
+
+    def set_pop(self, pop):
+        self.pop = pop
+
+    def complete_sim(self):
+        self.gen = 0
+
+    @property
+    def view_ops(self):
+        view_ops = []
+        for param in self.params:
+            param.set_pop(self.pop)
+            view_ops.extend(param.simupop_stats)
+        return view_ops
+
+    def start(self):
+        self.gen = 0
+        self.results = {}
+        self._num_sims = len(self.model._sim_ids)
+        self.results = [[] for x in range(self._num_sims)]
+
+    def complete_cycle(self, pop):
+        if self.gen % self.step != 0:
+            self.gen += 1
+            return
+        self.param.sample_size = self.model._sim_ids[
+            self._sim_id]['sample_size']
+        vals = self.param.get_values(pop)
+        self.results[self._sim_id].append(vals)
+        self.gen += 1
+
+    def end(self):
+        try:
+            vparam = list(self.model._variation_params.keys())[0]
+        except IndexError:
+            # Single parameter, lets show pop_size
+            vparam = 'pop_size'
+        all_steps = max([len(x) for x in self.results])
+        fig, axs = plt.subplots(all_steps +
+                                (1 if self.with_model else 0),
+                                self._num_sims,
+                                figsize=(16, 4 * all_steps), squeeze=False)
+        if self.with_model:
+            for i, param in enumerate(self.model._sim_ids):
+                ax = axs[0, i]
+                self.model._draw_sim(ax, param)
+                cval = str(param[vparam])
+                ax.set_title('%s: %s' % (vparam, cval))
+                if i != 0:
+                    plt.setp(ax.get_yticklabels(), visible=False)
+                    plt.setp(ax.get_xticklabels(), visible=False)
+        for i, param in enumerate(range(all_steps)):
+            for sim_id, results in enumerate(self.results):
+                if self.with_model:
+                    ax = axs[i + 1, sim_id]
+                else:
+                    ax = axs[i, sim_id]
+                    if i == 0:
+                        cval = str(self.model._sim_ids[sim_id][vparam])
+                        ax.set_title('%s: %s' % (vparam, cval))
+            for sim_id, results in enumerate(self.results):
+                sp_pos = defaultdict(list)
+                for (sp, ind), (x, y) in results[i].items():
+                    sp_pos[sp].append((x, y))
+                if self.with_model:
+                    ax = axs[i + 1, sim_id]
+                else:
+                    ax = axs[i, sim_id]
+                for c, (sp, vals) in enumerate(sp_pos.items()):
+                    x, y = zip(*vals)
+                    try:
+                        dot = ['.', '<', '>', 'v', '^', '8', 's', 'p',
+                               '*'][c // 7]
+                    except IndexError:
+                        dot = ','
+                    ax.plot(x, y, dot)
+        if not self.with_model:
+            plt.setp(axs[all_steps - 1, 0].get_xticklabels(),
+                     visible=True)
+        fig.tight_layout()
+        return fig
