@@ -23,6 +23,7 @@ from simuPOP import sampling
 
 
 def _get_sub_sample(pop, size, sub_pop=None):
+    '''Gets a subsample of individuals.'''
     if sub_pop is None:
         pop_s = pop
     else:
@@ -33,15 +34,26 @@ def _get_sub_sample(pop, size, sub_pop=None):
     return pop_s
 
 
-class Parameter():
+class Parameter:
+    '''A simulation parameter. Absctract super-class.'''
     def __init__(self, do_structured=False):
         self.name = None
         self.desc = None
-        self.simupop_info = []
         self.do_structured = do_structured
         self._sample_size = None
+        self._simupop_stats = []
+        self._info_fields = []
+        self._pop = None
+
+    def _get_values(self, pop):
+        '''Returns the parameter values for a certain subpopulation.
+
+           Implemented on concrete class.
+        '''
+        raise NotImplementedError('Needs to be implemented')
 
     def get_values(self, pop, sub_pop=None):
+        '''Returns the parameter values for a certain subpopulation.'''
         if self.do_structured:
             pop_ = _get_sub_sample(pop, self.sample_size, sub_pop)
         else:
@@ -49,68 +61,93 @@ class Parameter():
         ind_values = self._get_values(pop_)
         return ind_values
 
-    def set_pop(self, pop):
-        # To set the operators (at start)
-        self.pop = pop
+    @property
+    def pop(self, pop):
+        '''Population'''
+        self._pop = pop
+
+    @pop.setter
+    def pop(self, value):
+        '''Population setter.'''
+        self._pop = value
 
     @property
     def simupop_stats(self):
-        return []
+        '''Statistics that simupop needs to compute for this parameter.
+
+        This is normally added to evolve postOps.'''
+        return self._simupop_stats
 
     @property
     def sample_size(self):
+        '''Parameter sample size.'''
         return self._sample_size
 
     @sample_size.setter
     def sample_size(self, value):
+        '''Sample size setter.'''
         self._sample_size = value
+
+    @property
+    def info_fields(self):
+        '''Fields that need to be available on the Population object'''
+        return self._info_fields
+
+    @info_fields.setter
+    def info_fields(self, value):
+        '''Info_fields setter.'''
+        self._info_fields = value
+
 
 
 class ObsHe(Parameter):
+    '''Observed Heterozygosity'''
     def __init__(self):
         Parameter.__init__(self)
         self.name = 'ObsHe'
         self.desc = 'Observed Heterozygozity'
 
     def _get_values(self, pop):
-        st = sp.Stat(heteroFreq=True)
-        st.apply(pop)
+        stat = sp.Stat(heteroFreq=True)
+        stat.apply(pop)
         loci = list(pop.dvars().heteroFreq.keys())
         loci.sort()
         return [pop.dvars().heteroFreq[l] for l in loci]
 
 
 class ExpHe(Parameter):
+    '''Expected Heterozygosity'''
     def __init__(self, **kwargs):
         Parameter.__init__(self, kwargs)
         self.name = 'ExpHe'
         self.desc = 'Expected Heterozygozity'
 
     def _get_values(self, pop):
-        st = sp.Stat(alleleFreq=True)
-        st.apply(pop)
+        stat = sp.Stat(alleleFreq=True)
+        stat.apply(pop)
         freqs = pop.dvars().alleleFreq
         loci = list(freqs.keys())
         loci.sort()
-        expHe = []
+        exp_he = []
         for locus in loci:
             afreqs = freqs[locus]
-            expHo = 0
-            for allele, freq in afreqs.items():
-                expHo += freq*freq
-            expHe.append(1 - expHo)
-        return expHe
+            exp_ho = 0
+            for freq in afreqs.values():
+                exp_ho += freq * freq
+            exp_he.append(1 - exp_ho)
+        return exp_he
 
 
 class NumAlleles(Parameter):
+    '''Number of Alleles'''
     def __init__(self, **kwargs):
         Parameter.__init__(self, kwargs)
         self.name = 'NumAlleles'
         self.desc = 'Number of Alleles'
 
     def _get_values(self, pop):
-        st = sp.Stat(alleleFreq=True)
-        st.apply(pop)
+        stat = sp.Stat(alleleFreq=True)
+        stat.apply(pop)
         anum = pop.dvars().alleleNum
         loci = list(anum.keys())
         loci.sort()
@@ -118,8 +155,62 @@ class NumAlleles(Parameter):
         return anums
 
 
-class fst(Parameter):
+class LDNe(Parameter):
+    '''Estimating Ne according to LD (Waples)'''
+    def __init__(self, pcrit=0.02, **kwargs):
+        Parameter.__init__(self, kwargs)
+        self.name = 'LDNe'
+        self.desc = 'LDNe'
+        self.pcrit = pcrit
+
+    def _get_values(self, pop):
+        stat = sp.Stat(effectiveSize=sp.ALL_AVAIL, vars='Ne_LD')
+        stat.apply(pop)
+        ne_est = pop.dvars().Ne_LD
+        return ne_est[self.pcrit]
+
+
+class FreqDerived(Parameter):
+    '''Frequency of the derived allele.'''
     def __init__(self, **kwargs):
+        Parameter.__init__(self, kwargs)
+        self.name = 'FreqDerived'
+        self.desc = 'Frequency of the Derived Allele'
+
+    def _get_values(self, pop):
+        stat = sp.Stat(alleleFreq=True)
+        stat.apply(pop)
+        anum = pop.dvars().alleleFreq
+        loci = list(anum.keys())
+        loci.sort()
+        anums = [anum[l][1] for l in loci]
+        return anums
+
+
+class StructuredParameter(Parameter):
+    '''A parameter that is applied to population structure.'''
+    def __init__(self, **kwargs):
+        kwargs['do_structured'] = True
+        Parameter.__init__(self, kwargs)
+
+
+class FST(StructuredParameter):
+    '''Mean FST.'''
+    def __init__(self, **kwargs):
+        StructuredParameter.__init__(self)
+        self.name = 'FST'
+        self.desc = 'FST'
+
+    def _get_values(self, pop):
+        stat = sp.Stat(structure=sp.ALL_AVAIL)
+        stat.apply(pop)
+        my_fst = pop.dvars().F_st
+        return [my_fst]
+
+
+class fst(StructuredParameter):
+    '''FST per locus.'''
+    def __init__(self):
         StructuredParameter.__init__(self)
         self.name = 'fst'
         self.desc = 'FST per locus'
@@ -132,61 +223,18 @@ class fst(Parameter):
         return [fsts[l] for l in loci]
 
 
-class LDNe(Parameter):
-    def __init__(self, pcrit=0.02, **kwargs):
-        Parameter.__init__(self, kwargs)
-        self.name = 'LDNe'
-        self.desc = 'LDNe'
-        self.pcrit = pcrit
-
-    def _get_values(self, pop):
-        st = sp.Stat(effectiveSize=sp.ALL_AVAIL, vars='Ne_LD')
-        st.apply(pop)
-        ne = pop.dvars().Ne_LD
-        return ne[self.pcrit]
-
-
-class FreqDerived(Parameter):
-    def __init__(self, **kwargs):
-        Parameter.__init__(self, kwargs)
-        self.name = 'FreqDerived'
-        self.desc = 'Frequency of the Derived Allele'
-
-    def _get_values(self, pop):
-        st = sp.Stat(alleleFreq=True)
-        st.apply(pop)
-        anum = pop.dvars().alleleFreq
-        loci = list(anum.keys())
-        loci.sort()
-        anums = [anum[l][1] for l in loci]
-        return anums
-
-
-class StructuredParameter(Parameter):
-    def __init__(self, **kwargs):
-        kwargs['do_structured'] = True
-        Parameter.__init__(self, kwargs)
-
-
-class FST(StructuredParameter):
-    def __init__(self, **kwargs):
-        StructuredParameter.__init__(self)
-        self.name = 'FST'
-        self.desc = 'FST'
-
-    def _get_values(self, pop):
-        st = sp.Stat(structure=sp.ALL_AVAIL)
-        st.apply(pop)
-        fst = pop.dvars().F_st
-        return [fst]
-
-
-class GenomicParameter(Parameter):
+class IndividualParameter(Parameter):
+    '''A Parameter that returns a value per individual'''
     def __init__(self, **kwargs):
         Parameter.__init__(self, kwargs)
 
 
-class PCA(GenomicParameter):
+class PCA(IndividualParameter):
+    '''Principal Components Analysis.'''
+    def __init__(self, **kwargs):
+        IndividualParameter.__init__(self, kwargs)
+        self.info_fields = ['ind_id']
+
     def _get_values(self, pop):
         nsp = pop.numSubPop()
         all_alleles = []
