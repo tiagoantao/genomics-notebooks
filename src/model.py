@@ -208,7 +208,7 @@ class Model:
         pr = self.prepare_sim(params)
         sim = pr['sim']
         for view in self._views:
-            view.set_sim_id(sim_id)
+            view.sim_id = sim_id
         sim.evolve(initOps=pr['init_ops'],
                    preOps=pr['pre_ops'],
                    postOps=pr['post_ops'],
@@ -240,7 +240,7 @@ class SinglePop(Model):
             params['num_msats'], params['mut_msat'])
         view_ops = []
         for view in self._views:
-            view.set_pop(pop)
+            view.pop = pop
             view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
@@ -272,7 +272,7 @@ class Bottleneck(Model):
         loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
-            view.set_pop(pop)
+            view.pop = pop
             view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
@@ -321,7 +321,7 @@ class SelectionPop(Model):
             self._create_single_pop(params['pop_size'], nloci)
         view_ops = []
         for view in self._views:
-            view.set_pop(pop)
+            view.pop = pop
             view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
@@ -365,7 +365,7 @@ class Island(Model):
         loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
-            view.set_pop(pop)
+            view.pop = pop
             view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
@@ -425,7 +425,7 @@ class SteppingStone(Model):
         loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
         view_ops = []
         for view in self._views:
-            view.set_pop(pop)
+            view.pop = pop
             view_ops.extend(view.view_ops)
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))

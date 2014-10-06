@@ -12,15 +12,19 @@
 
 from collections import defaultdict
 import statistics
+import os
 
 import matplotlib.pyplot as plt
 
 
-class View():
+class View:
     def __init__(self, model, stats=[], max_y=None):
         self.model = model
         self.stats = stats
         self.max_y = max_y
+        self.params = []
+        self._sim_id = None
+        self._pop = None
         model.register(self)
 
     def start(self):
@@ -29,11 +33,21 @@ class View():
     def end(self):
         pass
 
-    def set_sim_id(self, sim_id):
+    @property
+    def sim_id(self):
+        return self._sim_id
+    
+    @sim_id.setter
+    def sim_id(self, sim_id):
         self._sim_id = sim_id
+    
+    @property
+    def pop(self):
+        return self._pop
 
-    def set_pop(self, pop):
-        self.pop = pop
+    @pop.setter
+    def pop(self, pop):
+        self._pop = pop
 
     def complete_sim(self):
         pass
@@ -45,20 +59,23 @@ class View():
     def view_ops(self):
         view_ops = []
         for param in self.params:
-            param.set_pop(self.pop)
+            param.pop = self.pop
             view_ops.extend(param.simupop_stats)
         return view_ops
 
+    @property
+    def info_fields(self):
+        info_fields = []
+        for param in self.params:
+            info_fields.extend(param.info_fields)
+        return info_fields
+        
 
 class BasicView(View):
     def __init__(self, model, params, stats=[], max_y=None, with_model=False):
         View.__init__(self, model, stats, max_y)
         self.with_model = with_model
         self.params = params
-        info_fields = []
-        for param in params:
-            info_fields.extend(param.simupop_info)
-        self.info_fields = list(set(info_fields))
 
     def start(self):
         self.results = {}
@@ -148,8 +165,7 @@ class BasicViewTwo(View):
     def __init__(self, model, param, stats=[], highlight=None):
         View.__init__(self, model, stats)
         info_fields = []
-        info_fields.extend(param.simupop_info)
-        self.info_fields = list(set(info_fields))
+        info_fields.extend(param.info_fields)
         self.params = [param]
         self.param = param
         self.highlight = highlight
@@ -219,9 +235,8 @@ class MetaVsDemeView(View):
         self.deme_param = deme_param
         self.params = [meta_param, deme_param]
         info_fields = []
-        info_fields.extend(meta_param.simupop_info)
-        info_fields.extend(deme_param.simupop_info)
-        self.info_fields = list(set(info_fields))
+        info_fields.extend(meta_param.info_fields)
+        info_fields.extend(deme_param.info_fields)
 
     def start(self):
         # need to add stats
@@ -294,40 +309,59 @@ class MetaVsDemeView(View):
         return fig
 
 
-class IndividualView():
-    # XXX merge with view
+def _plot_2d(ax, result, prev=None):
+    mult_x = 1
+    mult_y = 1
+    x_0 = []
+    y_0 = []
+    for (sp, ind), dims in result.items():
+        if sp != 0:
+            continue
+        x_0.append(dims[0])
+        y_0.append(dims[1])
+    x_0 = sorted(x_0)[len(x_0) // 2]
+    y_0 = sorted(y_0)[len(y_0) // 2]
+
+    if prev is not None:
+        xp_0, yp_0 = prev
+        if abs(xp_0 - x_0) > abs(xp_0 + x_0):
+            mult_x = -1
+        if abs(yp_0 - y_0) > abs(yp_0 + y_0):
+            mult_y = -1
+        x_0 *= mult_x
+        y_0 *= mult_y
+    sp_pos = defaultdict(list)
+    for (sp, ind), dims in result.items():
+        x = mult_x * dims[0]
+        y = mult_y * dims[1]
+        sp_pos[sp].append((x, y))
+    sps = sorted(sp_pos.keys())
+    for c, sp in enumerate(sps):
+        vals = sp_pos[sp]
+        x, y = zip(*vals)
+        try:
+            dot = ['.', '<', '>', 'v', '^', '8', 's', 'p',
+                   '*'][c // 7]
+        except IndexError:
+            dot = '*'
+        color = ['k', 'r', 'g', 'b', 'm', 'c', 'y'][c % 7]
+        ax.plot(x, y, dot, color=color)
+    return x_0, y_0
+
+
+class IndividualView(View):
     def __init__(self, model, param, step=10, with_model=False):
-        self.model = model
-        model.register(self)
-        info_fields = []
-        info_fields.extend(param.simupop_info)
-        self.info_fields = list(set(info_fields))
-        self.param = param
+        View.__init__(self, model, stats=[], max_y=None)
         self.params = [param]
         self.gen = 0
         self.step = step
         self.with_model = with_model
 
-    def set_sim_id(self, sim_id):
-        self._sim_id = sim_id
-
-    def set_pop(self, pop):
-        self.pop = pop
-
     def complete_sim(self):
         self.gen = 0
 
-    @property
-    def view_ops(self):
-        view_ops = []
-        for param in self.params:
-            param.set_pop(self.pop)
-            view_ops.extend(param.simupop_stats)
-        return view_ops
-
     def start(self):
         self.gen = 0
-        self.results = {}
         self._num_sims = len(self.model._sim_ids)
         self.results = [[] for x in range(self._num_sims)]
 
@@ -335,9 +369,9 @@ class IndividualView():
         if self.gen % self.step != 0:
             self.gen += 1
             return
-        self.param.sample_size = self.model._sim_ids[
+        self.params[0].sample_size = self.model._sim_ids[
             self._sim_id]['sample_size']
-        vals = self.param.get_values(pop)
+        vals = self.params[0].get_values(pop)
         self.results[self._sim_id].append(vals)
         self.gen += 1
 
@@ -372,7 +406,9 @@ class IndividualView():
                         ax.set_title('%s: %s' % (vparam, cval))
             for sim_id, results in enumerate(self.results):
                 sp_pos = defaultdict(list)
-                for (sp, ind), (x, y) in results[i].items():
+                for (sp, ind), dims in results[i].items():
+                    x = dims[0]
+                    y = dims[1]
                     sp_pos[sp].append((x, y))
                 if self.with_model:
                     ax = axs[i + 1, sim_id]
@@ -391,3 +427,64 @@ class IndividualView():
                      visible=True)
         fig.tight_layout()
         return fig
+
+
+class AnimatedIndividualView(View):
+    '''Ánimated view of individuals over time. 2D
+    
+       Single simulation (no more)
+       '''
+    def __init__(self, model, param, step=10, pref='tmp'):
+        View.__init__(self, model, stats=[], max_y=None)
+        self.params = [param]
+        self.gen = 0
+        self.step = step
+        self.pref = pref
+
+    def complete_sim(self):
+        pass  # Single simulation
+
+    def start(self):
+        self.gen = 0
+        self.results = []
+
+    def complete_cycle(self, pop):
+        if self.gen % self.step != 0:
+            self.gen += 1
+            return
+        self.params[0].sample_size = self.model._sim_ids[0]['sample_size']
+        vals = self.params[0].get_values(pop)
+        self.results.append(vals)
+        self.gen += 1
+
+    def _get_lims(self):
+        xmax = ymax = float('-inf')
+        for result in self.results:
+            for pop_inf, dims in result.items():
+                x = dims[0]
+                y = dims[1]
+                if abs(x) > xmax:
+                    xmax = abs(x)
+                if abs(y) > ymax:
+                    ymax = abs(y)
+        return xmax, ymax
+
+
+    def end(self):
+        num_frames = len(self.results)
+        xmax, ymax = self._get_lims()
+        fig = plt.figure(figsize=(16, 9))
+        prev = None
+        for i in range(num_frames):
+            ax = plt.axes(xlim=(-xmax, xmax), ylim=(-ymax, ymax))
+            prev = _plot_2d(ax, self.results[i], prev)
+            fig.savefig('%s%04d.png' % (self.pref, i + 1))
+            fig.clf()
+        try:
+            os.remove('%s.mp4' % self.pref)
+        except FileNotFoundError:
+            pass  # OK, does not exist
+        os.system('avconv -r 2 -f image2 -i %s%%04d.png %s.mp4 -vcodec libx264' % (self.pref, self.pref))
+        for i in range(num_frames):
+            os.remove('%s%04d.png' % (self.pref, i + 1))
+        return None

@@ -225,14 +225,14 @@ class fst(StructuredParameter):
 
 class IndividualParameter(Parameter):
     '''A Parameter that returns a value per individual'''
-    def __init__(self, **kwargs):
-        Parameter.__init__(self, kwargs)
+    def __init__(self):
+        Parameter.__init__(self)
 
 
 class PCA(IndividualParameter):
     '''Principal Components Analysis.'''
-    def __init__(self, **kwargs):
-        IndividualParameter.__init__(self, kwargs)
+    def __init__(self):
+        IndividualParameter.__init__(self)
         self.info_fields = ['ind_id']
 
     def _get_values(self, pop):
