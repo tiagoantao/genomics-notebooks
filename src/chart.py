@@ -15,6 +15,8 @@ import statistics
 import os
 
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 
 class View:
@@ -36,11 +38,11 @@ class View:
     @property
     def sim_id(self):
         return self._sim_id
-    
+
     @sim_id.setter
     def sim_id(self, sim_id):
         self._sim_id = sim_id
-    
+
     @property
     def pop(self):
         return self._pop
@@ -69,7 +71,7 @@ class View:
         for param in self.params:
             info_fields.extend(param.info_fields)
         return info_fields
-        
+
 
 class BasicView(View):
     def __init__(self, model, params, stats=[], max_y=None, with_model=False):
@@ -91,7 +93,8 @@ class BasicView(View):
 
     def complete_cycle(self, pop):
         for param in self.params:
-            param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
+            samp_size = self.model._sim_ids[self._sim_id]['sample_size']
+            param.sample_size = samp_size
             vals = param.get_values(pop)
             if len(self.results[param.name][self._sim_id]) == 0:
                 for i in range(len(vals)):
@@ -178,7 +181,8 @@ class BasicViewTwo(View):
         vparams.sort()
 
     def complete_cycle(self, pop):
-        self.param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
+        samp_size = self.model._sim_ids[self._sim_id]['sample_size']
+        self.param.sample_size = samp_size
         vals = self.param.get_values(pop)
         if len(self.results[self.param][self._sim_id]) == 0:
             for i in range(len(vals)):
@@ -246,8 +250,9 @@ class MetaVsDemeView(View):
 
     def complete_cycle(self, pop):
         # need to add stats
-        self.deme_param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
-        self.meta_param.sample_size = self.model._sim_ids[self._sim_id]['sample_size']
+        samp_size = self.model._sim_ids[self._sim_id]['sample_size']
+        self.deme_param.sample_size = samp_size
+        self.meta_param.sample_size = samp_size
         for sub_pop in range(pop.numSubPop()):
             vals = self.deme_param.get_values(pop, sub_pop)
             if len(self.deme_results[self._sim_id][sub_pop]) == 0:
@@ -431,7 +436,7 @@ class IndividualView(View):
 
 class AnimatedIndividualView(View):
     '''Ánimated view of individuals over time. 2D
-    
+
        Single simulation (no more)
        '''
     def __init__(self, model, param, step=10, pref='tmp'):
@@ -469,22 +474,22 @@ class AnimatedIndividualView(View):
                     ymax = abs(y)
         return xmax, ymax
 
-
     def end(self):
         num_frames = len(self.results)
         xmax, ymax = self._get_lims()
-        fig = plt.figure(figsize=(16, 9))
+        fig = Figure(figsize=(16, 9))
         prev = None
         for i in range(num_frames):
             ax = plt.axes(xlim=(-xmax, xmax), ylim=(-ymax, ymax))
             prev = _plot_2d(ax, self.results[i], prev)
+            canvas = FigureCanvasAgg(fig)
             fig.savefig('%s%04d.png' % (self.pref, i + 1))
-            fig.clf()
         try:
             os.remove('%s.mp4' % self.pref)
         except FileNotFoundError:
             pass  # OK, does not exist
-        os.system('avconv -r 2 -f image2 -i %s%%04d.png %s.mp4 -vcodec libx264' % (self.pref, self.pref))
+        os.system('avconv -r 2 -f image2 -i %s%%04d.png %s.mp4 -vcodec libx264'
+                  % (self.pref, self.pref))
         for i in range(num_frames):
             os.remove('%s%04d.png' % (self.pref, i + 1))
-        return None
+        return '%s.mp4' % self.pref
