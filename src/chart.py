@@ -477,19 +477,19 @@ class AnimatedIndividualView(View):
     def end(self):
         num_frames = len(self.results)
         xmax, ymax = self._get_lims()
-        fig = Figure(figsize=(16, 9))
         prev = None
         for i in range(num_frames):
-            ax = plt.axes(xlim=(-xmax, xmax), ylim=(-ymax, ymax))
-            prev = _plot_2d(ax, self.results[i], prev)
+            fig = Figure(figsize=(16, 9))
             canvas = FigureCanvasAgg(fig)
-            fig.savefig('%s%04d.png' % (self.pref, i + 1))
+            ax = fig.add_subplot(111, xlim=(-xmax, xmax), ylim=(-ymax, ymax))
+            prev = _plot_2d(ax, self.results[i], prev)
+            canvas.print_figure('%s%04d.png' % (self.pref, i + 1))
         try:
             os.remove('%s.mp4' % self.pref)
         except FileNotFoundError:
             pass  # OK, does not exist
-        os.system('avconv -r 2 -f image2 -i %s%%04d.png %s.mp4 -vcodec libx264'
+        os.system('avconv -r 1 -f image2 -i %s%%04d.png %s.mp4 -vcodec libx264'
                   % (self.pref, self.pref))
-        for i in range(num_frames):
-            os.remove('%s%04d.png' % (self.pref, i + 1))
+        #for i in range(num_frames):
+        #    os.remove('%s%04d.png' % (self.pref, i + 1))
         return '%s.mp4' % self.pref
