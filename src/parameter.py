@@ -99,7 +99,6 @@ class Parameter:
         self._info_fields = value
 
 
-
 class ObsHe(Parameter):
     '''Observed Heterozygosity'''
     def __init__(self):
@@ -266,7 +265,8 @@ class PCA(IndividualParameter):
             arr.append(inds[ind])
         my_pca = pca(n_components=2)
         X = np.array(arr)
-        X_r = my_pca.fit(X).transform(X)
+        my_pca.fit(X)
+        X_r = my_pca.transform(X)
         my_components = {}
         for i, ind in enumerate(ind_order):
             my_components[ind] = X_r[i]
