@@ -435,16 +435,21 @@ class IndividualView(View):
 
 
 class AnimatedIndividualView(View):
-    '''Ánimated view of individuals over time. 2D
+    '''Animated view of individuals over time. 2D
 
        Single simulation (no more)
        '''
-    def __init__(self, model, param, step=10, pref='tmp'):
+    def __init__(self, model, param, step=10, pref=None):
         View.__init__(self, model, stats=[], max_y=None)
+        if pref is None:
+            pref = 'pca-%d' % AnimatedIndividualView.AUTO_PREF
+            AnimatedIndividualView.AUTO_PREF += 1
         self.params = [param]
         self.gen = 0
         self.step = step
         self.pref = pref
+
+    AUTO_PREF = 1
 
     def complete_sim(self):
         pass  # Single simulation
@@ -478,11 +483,19 @@ class AnimatedIndividualView(View):
         num_frames = len(self.results)
         xmax, ymax = self._get_lims()
         prev = None
+        for i in range(10000):
+            try:
+                os.remove('%s%04d.png' % (self.pref, i + 1))
+            except:
+                break  # No more
         for i in range(num_frames):
             fig = Figure(figsize=(16, 9))
             canvas = FigureCanvasAgg(fig)
             ax = fig.add_subplot(111, xlim=(-xmax, xmax), ylim=(-ymax, ymax))
             prev = _plot_2d(ax, self.results[i], prev)
+            ax.text(0, -ymax, 'Generation: %03d' % (i * self.step),
+                    ha='left', va='bottom', fontsize=16)
+            fig.tight_layout()
             canvas.print_figure('%s%04d.png' % (self.pref, i + 1))
         try:
             os.remove('%s.mp4' % self.pref)
@@ -490,6 +503,6 @@ class AnimatedIndividualView(View):
             pass  # OK, does not exist
         os.system('avconv -r 1 -f image2 -i %s%%04d.png %s.mp4 -vcodec libx264'
                   % (self.pref, self.pref))
-        #for i in range(num_frames):
-        #    os.remove('%s%04d.png' % (self.pref, i + 1))
+        for i in range(num_frames):
+            os.remove('%s%04d.png' % (self.pref, i + 1))
         return '%s.mp4' % self.pref
