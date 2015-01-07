@@ -130,6 +130,8 @@ class BasicView(View):
         for i, param in enumerate(self.params):
             min_param = None
             max_param = None
+            if self.max_y is not None and self.max_y[i] is not None:
+                max_param = self.max_y[i]
             for sim_id, results in enumerate(self.results[param.name]):
                 if self.with_model:
                     ax = axs[i + 1, sim_id]
@@ -147,9 +149,9 @@ class BasicView(View):
                     stat_dict = self.stat_results[stat][param.name]
                     ax.plot(stat_dict[sim_id], 'k', lw=4)
                 ymin, ymax = ax.get_ylim()
-                if min_param is None or ymin < min_param:
+                if min_param is None:
                     min_param = ymin
-                if max_param is None or ymax > max_param:
+                if max_param is None:
                     max_param = ymax
             for sim_id, results in enumerate(self.results[param.name]):
                 if self.with_model:
@@ -165,8 +167,8 @@ class BasicView(View):
 
 
 class BasicViewTwo(View):
-    def __init__(self, model, param, stats=[], highlight=None):
-        View.__init__(self, model, stats)
+    def __init__(self, model, param, stats=[], highlight=None, max_y=None):
+        View.__init__(self, model, stats, max_y)
         info_fields = []
         info_fields.extend(param.info_fields)
         self.params = [param]
@@ -220,6 +222,9 @@ class BasicViewTwo(View):
                         axs[j, i].plot(my_case)
                     else:
                         axs[j, i].plot(my_case, 'k', lw=0.5)
+                if self.max_y is not None:
+                    mmin = axs[j, i].get_ylim()[0]
+                    axs[j, i].set_ylim(mmin, self.max_y)
         plt.setp(axs[0, 0].get_yticklabels(), visible=True)
         plt.setp(axs[0, len(p1) - 1].get_xticklabels(), visible=True)
         fig.tight_layout()
