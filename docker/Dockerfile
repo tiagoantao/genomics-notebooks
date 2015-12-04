@@ -9,6 +9,7 @@ RUN apt-get install --force-yes -y liblapack-dev libblas-dev
 RUN apt-get install --force-yes -y gfortran
 RUN pip install scipy
 RUN pip install scikit-learn
+RUN apt-get install --force-yes -y swig
 RUN pip install simupop
 WORKDIR /
 RUN git clone https://github.com/tiagoantao/genomics-notebooks.git
