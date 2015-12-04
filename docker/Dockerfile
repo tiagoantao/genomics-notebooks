@@ -1,7 +1,8 @@
 FROM jupyter/notebook
 MAINTAINER Tiago Antao <tra@popgen.net>
 
-RUN apt-get install --force-yes -y libfreetyp6-dev libpng12-dev
+RUN apt-get update
+RUN apt-get install --force-yes -y libfreetype6-dev libpng12-dev
 RUN pip install matplotlib
 RUN pip install scikit-learn
 RUN pip install simupop
