@@ -11,6 +11,7 @@ RUN pip install scipy
 RUN pip install scikit-learn
 RUN apt-get install --force-yes -y swig
 RUN pip install simupop
+RUN pip install networkx
 WORKDIR /
 RUN git clone https://github.com/tiagoantao/genomics-notebooks.git
 WORKDIR /genomics-notebooks
