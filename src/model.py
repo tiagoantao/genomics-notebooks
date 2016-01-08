@@ -40,6 +40,8 @@ class Model:
         self._views = []
         self.pop_size = 100
         self.num_msats = 10
+        self.num_snps = 0  # With SNPs, MSats disappear
+        self.snp_freq = 0.1  # Frequency of the derived allele
         self.num_msat_alleles = 10
         self.mut_msat = None
         self.sample_size = None  # All individuals
@@ -236,9 +238,14 @@ class SinglePop(Model):
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['pop_size'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(
-            params['num_msats'], mut=params['mut_msat'],
-            start_alleles=params['num_msat_alleles'])
+        if params['num_snps'] > 0:
+            loci, genome_init = self._create_snp_genome(nloci,
+                freq=params['snp_freq'])
+            gpre_ops = []
+        else:
+            loci, genome_init, gpre_ops = self._create_genome(
+                params['num_msats'], mut=params['mut_msat'],
+                start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
@@ -270,8 +277,14 @@ class Bottleneck(Model):
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['start_size'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'],
-            start_alleles=params['num_msat_alleles'])
+        if params['num_snps'] > 0:
+            loci, genome_init = self._create_snp_genome(nloci,
+                freq=params['snp_freq'])
+            gpre_ops = []
+        else:
+            loci, genome_init, gpre_ops = self._create_genome(
+                params['num_msats'],
+                start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
@@ -311,7 +324,6 @@ class SelectionPop(Model):
     def __init__(self, gens):
         Model.__init__(self, gens)
         self.sel = 0.01
-        self.freq = 0.01
         self.neutral_loci = 0
 
     def prepare_sim(self, params):
@@ -328,7 +340,8 @@ class SelectionPop(Model):
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
-        loci, genome_init = self._create_snp_genome(nloci, freq=params['freq'])
+        loci, genome_init = self._create_snp_genome(nloci,
+            freq=params['snp_freq'])
         sim = sp.Simulator(pop, 1, True)
         if params['sel_type'] == 'hz_advantage':
             ms = sp.MapSelector(loci=0, fitness={
@@ -364,8 +377,14 @@ class Island(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_island([params['pop_size']] * params['num_pops'],
                                 params['mig'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'],
-            start_alleles=params['num_msat_alleles'])
+        if params['num_snps'] > 0:
+            loci, genome_init = self._create_snp_genome(nloci,
+                freq=params['snp_freq'])
+            gpre_ops = []
+        else:
+            loci, genome_init, gpre_ops = self._create_genome(
+                params['num_msats'],
+                start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
@@ -425,8 +444,14 @@ class SteppingStone(Model):
                     self._create_stepping_stone(
                         [[params['pop_size']] * params['num_pops_x']],
                         params['mig'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'],
-            start_alleles=params['num_msat_alleles'])
+        if params['num_snps'] > 0:
+            loci, genome_init = self._create_snp_genome(nloci,
+                freq=params['snp_freq'])
+            gpre_ops = []
+        else:
+            loci, genome_init, gpre_ops = self._create_genome(
+                params['num_msats'],
+                start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
