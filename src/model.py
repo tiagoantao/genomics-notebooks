@@ -239,7 +239,7 @@ class SinglePop(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['pop_size'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(nloci,
+            loci, genome_init = self._create_snp_genome(params['num_snps'],
                 freq=params['snp_freq'])
             gpre_ops = []
         else:
@@ -278,7 +278,7 @@ class Bottleneck(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['start_size'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(nloci,
+            loci, genome_init = self._create_snp_genome(params['num_snps'],
                 freq=params['snp_freq'])
             gpre_ops = []
         else:
@@ -378,7 +378,7 @@ class Island(Model):
             self._create_island([params['pop_size']] * params['num_pops'],
                                 params['mig'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(nloci,
+            loci, genome_init = self._create_snp_genome(params['num_snps'],
                 freq=params['snp_freq'])
             gpre_ops = []
         else:
@@ -445,7 +445,7 @@ class SteppingStone(Model):
                         [[params['pop_size']] * params['num_pops_x']],
                         params['mig'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(nloci,
+            loci, genome_init = self._create_snp_genome(params['num_snps'],
                 freq=params['snp_freq'])
             gpre_ops = []
         else:
