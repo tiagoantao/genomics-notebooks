@@ -40,6 +40,7 @@ class Model:
         self._views = []
         self.pop_size = 100
         self.num_msats = 10
+        self.num_msat_alleles = 10
         self.mut_msat = None
         self.sample_size = None  # All individuals
         self._stats = set()
@@ -97,12 +98,11 @@ class Model:
 
         return loci, init_ops
 
-    def _create_genome(self, num_msats, mut=None):
+    def _create_genome(self, num_msats, mut=None, start_alleles=10):
         init_ops = []
         loci = num_msats * [1]
         pre_ops = []
         max_allele_msats = 100
-        start_alleles = 10
 
         for msat in range(num_msats):
             diri = np.random.mtrand.dirichlet([1.0] * start_alleles)
@@ -237,7 +237,8 @@ class SinglePop(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['pop_size'], params['num_msats'])
         loci, genome_init, gpre_ops = self._create_genome(
-            params['num_msats'], params['mut_msat'])
+            params['num_msats'], mut=params['mut_msat'],
+            start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
@@ -269,7 +270,8 @@ class Bottleneck(Model):
                 self._info_fields.add(info)
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['start_size'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'],
+            start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
@@ -362,7 +364,8 @@ class Island(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_island([params['pop_size']] * params['num_pops'],
                                 params['mig'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'],
+            start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
@@ -422,7 +425,8 @@ class SteppingStone(Model):
                     self._create_stepping_stone(
                         [[params['pop_size']] * params['num_pops_x']],
                         params['mig'], params['num_msats'])
-        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'])
+        loci, genome_init, gpre_ops = self._create_genome(params['num_msats'],
+            start_alleles=params['num_msat_alleles'])
         view_ops = []
         for view in self._views:
             view.pop = pop
