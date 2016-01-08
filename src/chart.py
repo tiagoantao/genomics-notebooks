@@ -194,10 +194,13 @@ class BasicViewTwo(View):
                 self.results[self.param][self._sim_id][i].append(vals[i])
 
     def end(self):
+        done_instances = set()
         def get_sim_id(p1, v1, p2, v2):
             for i, sim_params in enumerate(self.model._sim_ids):
-                if sim_params[p1] == v1 and sim_params[p2] == v2:
-                    return i
+                if sim_params[p1] == v1 and sim_params[p2] == v2 and \
+                    i not in done_instances:
+                        done_instances.add(i)
+                        return i
         vparams = list(self.model._variation_params.keys())
         vparams.sort()
         p1 = self.model._variation_params[vparams[0]]
