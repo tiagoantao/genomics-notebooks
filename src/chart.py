@@ -149,9 +149,9 @@ class BasicView(View):
                     stat_dict = self.stat_results[stat][param.name]
                     ax.plot(stat_dict[sim_id], 'k', lw=4)
                 ymin, ymax = ax.get_ylim()
-                if min_param is None:
+                if min_param is None or min_param > ymin:
                     min_param = ymin
-                if max_param is None:
+                if max_param is None or max_param < ymax:
                     max_param = ymax
             for sim_id, results in enumerate(self.results[param.name]):
                 if self.with_model:
