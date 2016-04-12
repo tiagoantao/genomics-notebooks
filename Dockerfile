@@ -7,4 +7,4 @@ USER root
 USER main
 
 # Install Julia kernel
-RUN source activate python3; pip install simupop; source deactivate
+RUN bash docker_prepare.sh
