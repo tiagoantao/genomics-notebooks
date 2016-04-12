@@ -3,6 +3,7 @@ FROM andrewosh/binder-base
 MAINTAINER Tiago Antao <tiagoantao@gmail.com>
 
 USER root
+RUN apt-get update -y
 RUN apt-get install -y swig
 
 USER main
