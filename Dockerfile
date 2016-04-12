@@ -6,5 +6,5 @@ USER root
 
 USER main
 
-# Install Julia kernel
+COPY docker_prepare.sh /
 RUN bash docker_prepare.sh
