@@ -7,4 +7,4 @@ USER root
 USER main
 
 COPY docker_prepare.sh /
-RUN bash docker_prepare.sh
+RUN bash /docker_prepare.sh
