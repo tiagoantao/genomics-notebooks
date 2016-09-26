@@ -6,7 +6,7 @@
    :copyright: Copyright 2014 by Tiago Antao
    :license: GNU Affero, see LICENSE for details
 
-.. moduleauthor:: Tiago Antao <tra@popgen.net>
+.. moduleauthor:: Tiago Antao <tiagoantao@gmail.com>
 
 '''
 
@@ -20,9 +20,10 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 
 class View:
-    def __init__(self, model, stats=[], max_y=None):
+    def __init__(self, model, stats=None, min_y=None, max_y=None):
         self.model = model
-        self.stats = stats
+        self.stats = stats if stats is not None else []
+        self.min_y = min_y
         self.max_y = max_y
         self.params = []
         self._sim_id = None
@@ -74,8 +75,9 @@ class View:
 
 
 class BasicView(View):
-    def __init__(self, model, params, stats=[], max_y=None, with_model=False):
-        View.__init__(self, model, stats, max_y)
+    def __init__(self, model, params, stats=None, min_y=None, max_y=None,
+                 with_model=False):
+        View.__init__(self, model, stats, min_y, max_y)
         self.with_model = with_model
         self.params = params
 
@@ -132,6 +134,8 @@ class BasicView(View):
             max_param = None
             if self.max_y is not None and self.max_y[i] is not None:
                 max_param = self.max_y[i]
+            if self.min_y is not None and self.min_y[i] is not None:
+                min_param = self.min_y[i]
             for sim_id, results in enumerate(self.results[param.name]):
                 if self.with_model:
                     ax = axs[i + 1, sim_id]
@@ -167,8 +171,9 @@ class BasicView(View):
 
 
 class BasicViewTwo(View):
-    def __init__(self, model, param, stats=[], highlight=None, max_y=None):
-        View.__init__(self, model, stats, max_y)
+    def __init__(self, model, param, stats=None, highlight=None,
+                 min_y=None, max_y=None):
+        View.__init__(self, model, stats, min_y, max_y)
         info_fields = []
         info_fields.extend(param.info_fields)
         self.params = [param]
@@ -195,12 +200,13 @@ class BasicViewTwo(View):
 
     def end(self):
         done_instances = set()
+
         def get_sim_id(p1, v1, p2, v2):
             for i, sim_params in enumerate(self.model._sim_ids):
                 if sim_params[p1] == v1 and sim_params[p2] == v2 and \
-                    i not in done_instances:
-                        done_instances.add(i)
-                        return i
+                   i not in done_instances:
+                    done_instances.add(i)
+                    return i
         vparams = list(self.model._variation_params.keys())
         vparams.sort()
         p1 = self.model._variation_params[vparams[0]]
@@ -241,8 +247,9 @@ class BasicViewTwo(View):
 
 
 class MetaVsDemeView(View):
-    def __init__(self, model, meta_param, deme_param, stats=[], max_y=None):
-        View.__init__(self, model, stats, max_y)
+    def __init__(self, model, meta_param, deme_param, stats=None,
+                 min_y=None, max_y=None):
+        View.__init__(self, model, stats, min_y, max_y)
         self.meta_param = meta_param
         self.deme_param = deme_param
         self.params = [meta_param, deme_param]
@@ -313,10 +320,8 @@ class MetaVsDemeView(View):
         ax = axs[self._num_sims - 1, 0]
         plt.setp(ax.get_yticklabels(), visible=True)
         plt.setp(ax.get_xticklabels(), visible=True)
-        if self.max_y is None:
-            ax.set_ylim(y_min, y_max)
-        else:
-            ax.set_ylim(y_min, self.max_y)
+        ax.set_ylim(y_min if self.min_y is None else self.min_y,
+                    y_min if self.min_y is None else self.min_y)
         fig.subplots_adjust(hspace=0, wspace=0)
 
         return fig

@@ -19,13 +19,13 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
 
+from IPython.core.pylabtools import print_figure
+from IPython.display import Image
+
 import simuOpt
 simuOpt.setOptions(gui=False, quiet=True)
 import simuPOP as sp
 from simuPOP import demography
-
-from IPython.core.pylabtools import print_figure
-from IPython.display import Image
 
 
 def _hook_view(pop, param):
@@ -236,13 +236,15 @@ class SinglePop(Model):
         for view in self._views:
             for info in view.info_fields:
                 self._info_fields.add(info)
-        pop, init_ops, pre_ops, post_ops = \
-            self._create_single_pop(params['pop_size'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(params['num_snps'],
-                freq=params['snp_freq'])
+            pop, init_ops, pre_ops, post_ops = \
+              self._create_single_pop(params['pop_size'], params['num_snps'])
+            loci, genome_init = self._create_snp_genome(
+                params['num_snps'], freq=params['snp_freq'])
             gpre_ops = []
         else:
+            pop, init_ops, pre_ops, post_ops = \
+              self._create_single_pop(params['pop_size'], params['num_msats'])
             loci, genome_init, gpre_ops = self._create_genome(
                 params['num_msats'], mut=params['mut_msat'],
                 start_alleles=params['num_msat_alleles'])
@@ -278,10 +280,14 @@ class Bottleneck(Model):
         pop, init_ops, pre_ops, post_ops = \
             self._create_single_pop(params['start_size'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(params['num_snps'],
-                freq=params['snp_freq'])
+            pop, init_ops, pre_ops, post_ops = \
+             self._create_single_pop(params['start_size'], params['num_snps'])
+            loci, genome_init = self._create_snp_genome(
+                params['num_snps'], freq=params['snp_freq'])
             gpre_ops = []
         else:
+            pop, init_ops, pre_ops, post_ops = \
+             self._create_single_pop(params['start_size'], params['num_msats'])
             loci, genome_init, gpre_ops = self._create_genome(
                 params['num_msats'],
                 start_alleles=params['num_msat_alleles'])
@@ -340,8 +346,8 @@ class SelectionPop(Model):
         for view in self._views:
             post_ops.append(sp.PyOperator(func=_hook_view, param=view))
         post_ops = view_ops + post_ops
-        loci, genome_init = self._create_snp_genome(nloci,
-            freq=params['snp_freq'])
+        loci, genome_init = self._create_snp_genome(
+            nloci, freq=params['snp_freq'])
         sim = sp.Simulator(pop, 1, True)
         if params['sel_type'] == 'hz_advantage':
             ms = sp.MapSelector(loci=0, fitness={
@@ -374,14 +380,17 @@ class Island(Model):
         for view in self._views:
             for info in view.info_fields:
                 self._info_fields.add(info)
-        pop, init_ops, pre_ops, post_ops = \
-            self._create_island([params['pop_size']] * params['num_pops'],
-                                params['mig'], params['num_msats'])
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(params['num_snps'],
-                freq=params['snp_freq'])
+            pop, init_ops, pre_ops, post_ops = \
+              self._create_island([params['pop_size']] * params['num_pops'],
+                                  params['mig'], params['num_snps'])
+            loci, genome_init = self._create_snp_genome(
+                params['num_snps'], freq=params['snp_freq'])
             gpre_ops = []
         else:
+            pop, init_ops, pre_ops, post_ops = \
+              self._create_island([params['pop_size']] * params['num_pops'],
+                                  params['mig'], params['num_msats'])
             loci, genome_init, gpre_ops = self._create_genome(
                 params['num_msats'],
                 start_alleles=params['num_msat_alleles'])
@@ -433,20 +442,21 @@ class SteppingStone(Model):
         for view in self._views:
             for info in view.info_fields:
                 self._info_fields.add(info)
+            nloci = params['num_snps'] if params['num_snps'] > 0 else params['num_msats']
             if self._two_d:
                 pop, init_ops, pre_ops, post_ops = \
                     self._create_stepping_stone(
                         [[params['pop_size']] * params['num_pops_x']] *
                         params['num_pops_y'],
-                        params['mig'], params['num_msats'])
+                        params['mig'], nloci)
             else:
                 pop, init_ops, pre_ops, post_ops = \
                     self._create_stepping_stone(
                         [[params['pop_size']] * params['num_pops_x']],
-                        params['mig'], params['num_msats'])
+                        params['mig'], nloci)
         if params['num_snps'] > 0:
-            loci, genome_init = self._create_snp_genome(params['num_snps'],
-                freq=params['snp_freq'])
+            loci, genome_init = self._create_snp_genome(
+                params['num_snps'], freq=params['snp_freq'])
             gpre_ops = []
         else:
             loci, genome_init, gpre_ops = self._create_genome(
