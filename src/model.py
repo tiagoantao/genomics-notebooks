@@ -273,6 +273,28 @@ class SinglePop(Model):
         ax.set_ylim(-10, 1.1 * max(pop_sizes))
 
 
+class LinkagePop(SinglePop):
+    def __init__(self, gens, distance=None):
+        Model.__init__(self, gens)
+        self.distance = distance
+        self.num_snps = 2
+
+    def prepare_sim(self, params):
+        return SinglePop.prepare_sim(self, params)
+
+    def _create_snp_genome(self, num_snps, freq):
+        if self.distance is None:
+            return SinglePop._create_snp_genome(self, num_snps, freq)
+
+        init_ops = []
+        loci = num_snps * [1]
+
+        for snp in range(num_snps):
+            init_ops.append(sp.InitGenotype(freq=[1 - freq, freq], loci=snp))
+
+        return loci, init_ops
+
+
 class Bottleneck(Model):
     def prepare_sim(self, params):
         for view in self._views:
