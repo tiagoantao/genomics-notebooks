@@ -1,3 +1,3 @@
 source activate python3
-pip install simupop
+conda install -c https://conda.binstar.org/bpeng simuPOP
 source deactivate
